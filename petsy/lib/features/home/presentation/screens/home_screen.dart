@@ -9,6 +9,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:petsy/features/home/presentation/screens/map_picker_screen.dart';
 import 'package:petsy/features/home/presentation/screens/profile_page.dart';
 import 'package:petsy/features/home/presentation/screens/product_details_screen.dart';
+import 'package:petsy/features/home/presentation/screens/cart_screen.dart';
+import 'package:petsy/features/home/presentation/screens/orders_screen.dart'; // 🚀 ADDED REAL ORDERS SCREEN IMPORT
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -605,13 +607,14 @@ class _HomeScreenState extends State<HomeScreen> {
 
     Widget productImageWidget() {
       if (imageUrl.isEmpty) return const Icon(Icons.image, color: Colors.grey);
-      if (imageUrl.startsWith('http'))
+      if (imageUrl.startsWith('http')) {
         return Image.network(
           imageUrl,
           fit: BoxFit.contain,
           errorBuilder: (c, e, s) =>
               const Icon(Icons.image_not_supported, color: Colors.grey),
         );
+      }
       return Image.asset(
         imageUrl,
         fit: BoxFit.contain,
@@ -784,9 +787,10 @@ class _HomeScreenState extends State<HomeScreen> {
           if (label == "Profile") {
             nextScreen = const ProfilePage();
           } else if (label == "Cart") {
-            nextScreen = const CartScreen(); // Points to placeholder
+            nextScreen = const CartScreen();
           } else if (label == "Orders") {
-            nextScreen = const OrdersScreen(); // Points to placeholder
+            nextScreen =
+                const OrdersScreen(); // 🚀 POINTS TO THE REAL SCREEN NOW
           } else {
             return; // Already on Home
           }
@@ -1007,7 +1011,6 @@ class _PromoCarouselWidgetState extends State<PromoCarouselWidget> {
                             ),
                             const SizedBox(height: 12),
                             GestureDetector(
-                              // 🌟 LOGICAL FUNCTION: Promo Button navigates to Deals
                               onTap: () => Navigator.push(
                                 context,
                                 MaterialPageRoute(
@@ -1071,8 +1074,7 @@ class _PromoCarouselWidgetState extends State<PromoCarouselWidget> {
 }
 
 // ============================================================================
-// 🌟 ALL FUNCTIONAL PLACEHOLDER SCREENS & WIDGETS BELOW 🌟
-// These make sure every button you click actually goes somewhere!
+// 🌟 FUNCTIONAL SUB-SCREENS 🌟
 // ============================================================================
 
 class SearchScreen extends StatelessWidget {
@@ -1250,96 +1252,6 @@ class GenericProductsScreen extends StatelessWidget {
         child: Text(
           "$title list coming soon!",
           style: GoogleFonts.inter(color: Colors.grey, fontSize: 16),
-        ),
-      ),
-    );
-  }
-}
-
-class CartScreen extends StatelessWidget {
-  const CartScreen({super.key});
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FA),
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        title: Text(
-          "My Cart",
-          style: GoogleFonts.inter(
-            color: Colors.black87,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black87),
-          onPressed: () => Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (context) => const HomeScreen()),
-          ),
-        ),
-      ),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.shopping_cart_outlined,
-              size: 80,
-              color: Colors.grey.shade300,
-            ),
-            const SizedBox(height: 15),
-            Text(
-              "Your cart is empty.",
-              style: GoogleFonts.inter(color: Colors.grey, fontSize: 16),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class OrdersScreen extends StatelessWidget {
-  const OrdersScreen({super.key});
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FA),
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        title: Text(
-          "My Orders",
-          style: GoogleFonts.inter(
-            color: Colors.black87,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black87),
-          onPressed: () => Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (context) => const HomeScreen()),
-          ),
-        ),
-      ),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.receipt_long_outlined,
-              size: 80,
-              color: Colors.grey.shade300,
-            ),
-            const SizedBox(height: 15),
-            Text(
-              "You have no active orders.",
-              style: GoogleFonts.inter(color: Colors.grey, fontSize: 16),
-            ),
-          ],
         ),
       ),
     );

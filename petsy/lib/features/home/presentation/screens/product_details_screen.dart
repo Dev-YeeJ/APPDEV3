@@ -3,8 +3,11 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:share_plus/share_plus.dart';
 
-// --- Ensure this path matches your project folder structure ---
+// --- Ensure these paths match your project folder structure ---
 import 'package:petsy/features/home/presentation/screens/checkout_screen.dart';
+import 'package:petsy/features/home/presentation/screens/cart_screen.dart'; // 🚀 ADDED CART SCREEN IMPORT
+import 'package:provider/provider.dart';
+import 'package:petsy/providers/cart_provider.dart';
 
 class ProductDetailsScreen extends StatefulWidget {
   final Map<String, dynamic> product;
@@ -19,9 +22,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
   // --- MATCHING HOME SCREEN COLORS ---
   final Color _petsyGreen = const Color(0xFF2B8C61);
   final Color _petsyNavy = const Color(0xFF003466);
-  final Color _appBackground = const Color(
-    0xFFF8F9FA,
-  ); // Home Screen Scaffold Background
+  final Color _appBackground = const Color(0xFFF8F9FA);
 
   // State Variables
   int _quantity = 1;
@@ -48,15 +49,11 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
   }
 
   void _setupProductData() {
-    // 1. Pricing initialization
     _basePrice =
         double.tryParse(widget.product['price']?.toString() ?? '0.0') ?? 0.0;
     _currentUnitPrice = _basePrice;
-
-    // 2. Favorite Toggle
     _isFavorite = widget.product['isFavorite'] == true;
 
-    // 3. Adaptive Variations based on Category
     final String pType = widget.product['productType']?.toString() ?? 'Food';
 
     if (pType == 'Food') {
@@ -80,22 +77,19 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
     _selectedOpt2 = _opt2List.first;
   }
 
-  // --- 🧠 DYNAMIC PRICE CALCULATION ---
   void _updateSizeAndPrice(String newSize) {
     setState(() {
       _selectedOpt2 = newSize;
       int sizeIndex = _opt2List.indexOf(newSize);
 
-      // Realistic price multipliers for different sizes
-      if (sizeIndex == 0) {
+      if (sizeIndex == 0)
         _currentUnitPrice = _basePrice;
-      } else if (sizeIndex == 1) {
+      else if (sizeIndex == 1)
         _currentUnitPrice = _basePrice * 1.8;
-      } else if (sizeIndex == 2) {
+      else if (sizeIndex == 2)
         _currentUnitPrice = _basePrice * 3.5;
-      } else if (sizeIndex == 3) {
+      else if (sizeIndex == 3)
         _currentUnitPrice = _basePrice * 15.0;
-      }
     });
   }
 
@@ -108,14 +102,43 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
     );
   }
 
+  // 🌟 LOGICAL FUNCTION: Advanced Add To Cart Notification
   void _addToCart() {
     HapticFeedback.mediumImpact();
+
+    // 🚀 STEP 4: SEND DATA TO THE GLOBAL BRAIN (PROVIDER) 🚀
+    context.read<CartProvider>().addToCart(
+      widget.product,
+      _quantity,
+      _selectedOpt1, // Selected Flavor
+      _selectedOpt2, // Selected Size
+      _currentUnitPrice,
+    );
+
+    // Hide any previous snackbars so they don't pile up
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+
+    // Show the Success Notification
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text("✅ Added $_quantity item(s) to your cart!"),
+        content: Text(
+          "✅ Added $_quantity item(s) to your cart!",
+          style: GoogleFonts.inter(fontWeight: FontWeight.w600),
+        ),
         backgroundColor: _petsyGreen,
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        action: SnackBarAction(
+          label: 'VIEW CART',
+          textColor: Colors.white,
+          onPressed: () {
+            // Instantly jump to the Cart Screen
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (context) => const CartScreen()),
+            );
+          },
+        ),
       ),
     );
   }
@@ -148,7 +171,6 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
     final String imageUrl = widget.product['image'] ?? '';
     final String brand = widget.product['brand'] ?? 'Natural Balance';
 
-    // Database Description Fallback matching mockup text
     final String description =
         (widget.product['description']?.toString().isNotEmpty == true)
         ? widget.product['description']
@@ -156,8 +178,6 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
 
     return Scaffold(
       backgroundColor: _appBackground,
-
-      // --- HEADER (Matches Home Screen Buttons Perfectly) ---
       appBar: AppBar(
         backgroundColor: _appBackground,
         elevation: 0,
@@ -178,8 +198,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
             "Details",
             style: GoogleFonts.inter(
               color: _petsyNavy,
-              fontWeight: FontWeight
-                  .w900, // 👈 FIXED HERE: FontWeight.w900 instead of 900
+              fontWeight: FontWeight.w900,
               fontSize: 18,
             ),
           ),
@@ -212,7 +231,6 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // --- 1. PREMIUM WHITE IMAGE CONTAINER (For JPGs) ---
                   Container(
                     height: 280,
                     width: double.infinity,
@@ -221,8 +239,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                       vertical: 15,
                     ),
                     decoration: BoxDecoration(
-                      color: Colors
-                          .white, // PURE WHITE background makes JPG blend perfectly
+                      color: Colors.white,
                       borderRadius: BorderRadius.circular(30),
                       boxShadow: [
                         BoxShadow(
@@ -248,7 +265,6 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // --- 2. Title Section ---
                         Text(
                           name,
                           style: GoogleFonts.inter(
@@ -261,7 +277,6 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                         ),
                         const SizedBox(height: 10),
 
-                        // --- 3. Brand & Rating ---
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
@@ -306,7 +321,6 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                         ),
                         const SizedBox(height: 25),
 
-                        // --- 4. PRICE AND QUANTITY ROW ---
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
@@ -319,8 +333,6 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                                 letterSpacing: -1,
                               ),
                             ),
-
-                            // Quantity Buttons
                             Row(
                               children: [
                                 GestureDetector(
@@ -386,7 +398,6 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                         ),
                         const SizedBox(height: 35),
 
-                        // --- 5. Variation Sections ---
                         _buildVariationGrid(
                           title: _opt1Title,
                           options: _opt1List,
@@ -408,7 +419,6 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                           },
                         ),
 
-                        // --- 6. Expandable Description ---
                         Text(
                           widget.product['productType'] == 'Food'
                               ? "Ingredients"
@@ -469,7 +479,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
             ),
           ),
 
-          // --- 7. BOTTOM ACTION BAR ---
+          // --- BOTTOM ACTION BAR ---
           Container(
             padding: const EdgeInsets.fromLTRB(25, 15, 25, 30),
             decoration: BoxDecoration(
@@ -520,7 +530,6 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                     ),
                     onPressed: () {
                       HapticFeedback.heavyImpact();
-
                       Navigator.push(
                         context,
                         MaterialPageRoute(

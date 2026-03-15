@@ -3,9 +3,11 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:provider/provider.dart';
 
-// --- Ensure this path matches your project structure ---
+// --- Ensure these paths match your project structure ---
 import 'package:petsy/features/home/presentation/screens/home_screen.dart';
+import 'package:petsy/providers/cart_provider.dart';
 
 class CheckoutScreen extends StatefulWidget {
   final Map<String, dynamic> product;
@@ -38,15 +40,13 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   Stream<DocumentSnapshot>? _userDataStream;
 
   // --- LOGIC VARIABLES ---
-  final double _shippingFee =
-      50.00; // You can make this fetch from a DB later too!
+  final double _shippingFee = 50.00;
   String _selectedPaymentMethod = 'COD';
   final TextEditingController _noteController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
-    // Initialize the stream to fetch the logged-in user's live data
     if (currentUser != null) {
       _userDataStream = FirebaseFirestore.instance
           .collection('users')
@@ -57,82 +57,146 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
   String _formatPrice(double price) => price.toStringAsFixed(2);
 
-  // 🌟 SUCCESS MODAL
-  void _placeOrder() {
+  // 🚀 THE MAGIC BRIDGE: Place Order to Firebase
+  Future<void> _placeOrder() async {
     HapticFeedback.heavyImpact();
 
-    // TODO: Add Firestore write logic here to save the order to an 'orders' collection!
-
+    // 1. Show a loading circle while saving
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        backgroundColor: Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        contentPadding: const EdgeInsets.all(30),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: _petsyGreen.withOpacity(0.1),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(Icons.check_circle, color: _petsyGreen, size: 60),
-            ),
-            const SizedBox(height: 20),
-            Text(
-              "Order Placed!",
-              style: GoogleFonts.inter(
-                fontSize: 22,
-                fontWeight: FontWeight.w900,
-                color: _petsyNavy,
-              ),
-            ),
-            const SizedBox(height: 10),
-            Text(
-              "Your order has been successfully placed and is being processed.",
-              textAlign: TextAlign.center,
-              style: GoogleFonts.inter(
-                color: Colors.grey.shade600,
-                fontSize: 14,
-                height: 1.5,
-              ),
-            ),
-            const SizedBox(height: 30),
-            SizedBox(
-              width: double.infinity,
-              height: 50,
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: _petsyGreen,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  elevation: 0,
-                ),
-                onPressed: () {
-                  Navigator.pushAndRemoveUntil(
-                    context,
-                    MaterialPageRoute(builder: (context) => const HomeScreen()),
-                    (route) => false,
-                  );
-                },
-                child: Text(
-                  "Back to Home",
-                  style: GoogleFonts.inter(
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                    fontSize: 15,
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
+      builder: (context) => const Center(
+        child: CircularProgressIndicator(color: Color(0xFF2B8C61)),
       ),
     );
+
+    try {
+      if (currentUser != null) {
+        final double subtotal = widget.unitPrice * widget.quantity;
+        final double total = subtotal + _shippingFee;
+
+        // 2. Build the Order Data exactly how OrdersScreen expects it
+        final orderData = {
+          'orderDate': FieldValue.serverTimestamp(),
+          'status': 'toPay', // Defaults to 'To Pay' tab!
+          'totalPrice': total,
+          'paymentMethod': _selectedPaymentMethod,
+          'note': _noteController.text.trim(),
+          'items': [
+            {
+              'image': widget.product['image'] ?? '',
+              'name': widget.product['name'] ?? 'Unknown Item',
+              'brand': widget.product['brand'] ?? 'Petsy',
+              'size': widget.selectedSize,
+              'price': widget.unitPrice,
+              'quantity': widget.quantity,
+            },
+          ],
+        };
+
+        // 3. Save it to the user's "orders" collection in Firebase
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(currentUser!.uid)
+            .collection('orders')
+            .add(orderData);
+
+        // 4. Empty the Cart (Since they just bought it!)
+        if (mounted) {
+          context.read<CartProvider>().clearCart();
+        }
+      }
+
+      // Pop the loading circle
+      if (mounted) Navigator.pop(context);
+
+      // 5. Show the Success Modal
+      if (mounted) {
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => AlertDialog(
+            backgroundColor: Colors.white,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+            contentPadding: const EdgeInsets.all(30),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: _petsyGreen.withOpacity(0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(Icons.check_circle, color: _petsyGreen, size: 60),
+                ),
+                const SizedBox(height: 20),
+                Text(
+                  "Order Placed!",
+                  style: GoogleFonts.inter(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w900,
+                    color: _petsyNavy,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  "Your order has been successfully placed and is being processed.",
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.inter(
+                    color: Colors.grey.shade600,
+                    fontSize: 14,
+                    height: 1.5,
+                  ),
+                ),
+                const SizedBox(height: 30),
+                SizedBox(
+                  width: double.infinity,
+                  height: 50,
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _petsyGreen,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      elevation: 0,
+                    ),
+                    onPressed: () {
+                      // Take them back home
+                      Navigator.pushAndRemoveUntil(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const HomeScreen(),
+                        ),
+                        (route) => false,
+                      );
+                    },
+                    child: Text(
+                      "Back to Home",
+                      style: GoogleFonts.inter(
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                        fontSize: 15,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      // If Firebase fails, close loader and show error
+      if (mounted) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text("Error placing order: $e")));
+      }
+    }
   }
 
   Widget _buildProductImage(String imageUrl) {
@@ -155,7 +219,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       child: Scaffold(
         backgroundColor: _bgColor,
 
-        // --- APP BAR ---
         appBar: AppBar(
           backgroundColor: _bgColor,
           elevation: 0,
@@ -214,7 +277,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                           return _buildLoadingAddressCard();
                         }
 
-                        // Safely extract all dynamic data
                         final userData =
                             snapshot.data?.data() as Map<String, dynamic>? ??
                             {};
@@ -232,7 +294,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                             address['barangay'] ?? 'Barangay';
                         final String city = address['city'] ?? 'City';
 
-                        // Combine into a clean multi-line string
                         final String fullAddress = "$street\n$barangay, $city";
 
                         return Container(
@@ -316,7 +377,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                                   ],
                                 ),
                               ),
-                              // Optional Edit Button
                               GestureDetector(
                                 onTap: () {
                                   HapticFeedback.selectionClick();
@@ -651,7 +711,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                       ),
                       onPressed: _placeOrder,
                       child: Text(
-                        "Checkout",
+                        "Place Order",
                         style: GoogleFonts.inter(
                           fontSize: 15,
                           fontWeight: FontWeight.w800,
@@ -734,7 +794,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     );
   }
 
-  // --- UI HELPER: LOADING SKELETON ---
   Widget _buildLoadingAddressCard() {
     return Container(
       width: double.infinity,
