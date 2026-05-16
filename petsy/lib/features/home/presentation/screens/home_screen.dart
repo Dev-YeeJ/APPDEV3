@@ -4,13 +4,16 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:provider/provider.dart';
 
 // --- IMPORTANT IMPORTS ---
 import 'package:petsy/features/home/presentation/screens/map_picker_screen.dart';
 import 'package:petsy/features/home/presentation/screens/profile_page.dart';
 import 'package:petsy/features/home/presentation/screens/product_details_screen.dart';
 import 'package:petsy/features/home/presentation/screens/cart_screen.dart';
-import 'package:petsy/features/home/presentation/screens/orders_screen.dart'; // 🚀 ADDED REAL ORDERS SCREEN IMPORT
+import 'package:petsy/features/home/presentation/screens/orders_screen.dart';
+import 'package:petsy/features/home/presentation/screens/customer_chat_list_screen.dart';
+import 'package:petsy/providers/cart_provider.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -29,7 +32,6 @@ class _HomeScreenState extends State<HomeScreen> {
 
   // --- FIREBASE STREAM VARIABLES ---
   Stream<DocumentSnapshot>? _userDataStream;
-
   late Stream<QuerySnapshot> _bestSellerStream;
   late Stream<QuerySnapshot> _whatsNewStream;
   late Stream<QuerySnapshot> _favoritePicksStream;
@@ -58,17 +60,17 @@ class _HomeScreenState extends State<HomeScreen> {
     _bestSellerStream = FirebaseFirestore.instance
         .collection('products')
         .where('isBestSeller', isEqualTo: true)
-        .limit(6)
+        .limit(10) // Pulled extra in case some are archived
         .snapshots();
     _whatsNewStream = FirebaseFirestore.instance
         .collection('products')
         .where('isNew', isEqualTo: true)
-        .limit(6)
+        .limit(10)
         .snapshots();
     _favoritePicksStream = FirebaseFirestore.instance
         .collection('products')
         .where('isFavorite', isEqualTo: true)
-        .limit(6)
+        .limit(10)
         .snapshots();
   }
 
@@ -87,7 +89,6 @@ class _HomeScreenState extends State<HomeScreen> {
     await Future.delayed(const Duration(seconds: 1));
   }
 
-  // 🌟 LOGICAL FUNCTION: Show Filter Bottom Sheet
   void _openFilterBottomSheet() {
     HapticFeedback.selectionClick();
     showModalBottomSheet(
@@ -206,7 +207,6 @@ class _HomeScreenState extends State<HomeScreen> {
                                 ),
                                 const SizedBox(height: 4),
                                 GestureDetector(
-                                  // 🌟 LOGICAL FUNCTION: Open Map
                                   onTap: () => Navigator.push(
                                     context,
                                     MaterialPageRoute(
@@ -244,7 +244,6 @@ class _HomeScreenState extends State<HomeScreen> {
                             ),
                           ),
                           GestureDetector(
-                            // 🌟 LOGICAL FUNCTION: Open Notifications
                             onTap: () => Navigator.push(
                               context,
                               MaterialPageRoute(
@@ -294,6 +293,93 @@ class _HomeScreenState extends State<HomeScreen> {
                               ),
                             ),
                           ),
+                          const SizedBox(width: 12),
+                          // 🚀 CHAT BUTTON WITH UNREAD BADGE
+                          GestureDetector(
+                            onTap: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) =>
+                                    const CustomerChatListScreen(),
+                              ),
+                            ),
+                            child: Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                shape: BoxShape.circle,
+                                border: Border.all(color: Colors.grey.shade200),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.03),
+                                    blurRadius: 10,
+                                    offset: const Offset(0, 4),
+                                  ),
+                                ],
+                              ),
+                              child: Stack(
+                                clipBehavior: Clip.none,
+                                children: [
+                                  Icon(
+                                    Icons.forum_outlined,
+                                    color: _petsyNavy,
+                                    size: 24,
+                                  ),
+                                  // Unread badge
+                                  StreamBuilder<QuerySnapshot>(
+                                    stream: FirebaseFirestore.instance
+                                        .collection('chats')
+                                        .where(
+                                          'customerId',
+                                          isEqualTo: currentUser?.uid,
+                                        )
+                                        .snapshots(),
+                                    builder: (context, chatSnapshot) {
+                                      int unreadCount = 0;
+                                      if (chatSnapshot.hasData) {
+                                        for (var doc
+                                            in chatSnapshot.data!.docs) {
+                                          final data = doc.data() as Map;
+                                          final lastMsg =
+                                              data['lastMessage'] ?? '';
+                                          if (lastMsg.toString().startsWith(
+                                            'Admin:',
+                                          )) {
+                                            unreadCount++;
+                                          }
+                                        }
+                                      }
+                                      return unreadCount > 0
+                                          ? Positioned(
+                                              top: 2,
+                                              right: 2,
+                                              child: Container(
+                                                height: 20,
+                                                width: 20,
+                                                decoration: BoxDecoration(
+                                                  color: Colors.red,
+                                                  shape: BoxShape.circle,
+                                                ),
+                                                child: Center(
+                                                  child: Text(
+                                                    '$unreadCount',
+                                                    style: GoogleFonts.inter(
+                                                      color: Colors.white,
+                                                      fontSize: 11,
+                                                      fontWeight:
+                                                          FontWeight.bold,
+                                                    ),
+                                                  ),
+                                                ),
+                                              ),
+                                            )
+                                          : const SizedBox();
+                                    },
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
                         ],
                       ),
                     ),
@@ -307,7 +393,6 @@ class _HomeScreenState extends State<HomeScreen> {
                         children: [
                           Expanded(
                             child: GestureDetector(
-                              // 🌟 LOGICAL FUNCTION: Open Search Screen
                               onTap: () => Navigator.push(
                                 context,
                                 MaterialPageRoute(
@@ -347,7 +432,6 @@ class _HomeScreenState extends State<HomeScreen> {
                           ),
                           const SizedBox(width: 12),
                           GestureDetector(
-                            // 🌟 LOGICAL FUNCTION: Open Filters
                             onTap: _openFilterBottomSheet,
                             child: Container(
                               height: 50,
@@ -376,14 +460,13 @@ class _HomeScreenState extends State<HomeScreen> {
 
                     const SizedBox(height: 25),
 
-                    // --- 3. ISOLATED AUTO-SLIDING PROMO BANNER ---
+                    // --- 3. AUTO-SLIDING PROMO BANNER ---
                     const PromoCarouselWidget(),
 
                     const SizedBox(height: 25),
 
                     // --- 4. CATEGORIES ---
                     _buildSectionHeader("Categories", () {
-                      // 🌟 LOGICAL FUNCTION: See All Categories
                       Navigator.push(
                         context,
                         MaterialPageRoute(
@@ -403,7 +486,6 @@ class _HomeScreenState extends State<HomeScreen> {
                         itemCount: categories.length,
                         itemBuilder: (context, index) {
                           return GestureDetector(
-                            // 🌟 LOGICAL FUNCTION: Open Specific Category
                             onTap: () {
                               Navigator.push(
                                 context,
@@ -573,7 +655,29 @@ class _HomeScreenState extends State<HomeScreen> {
           );
         }
 
-        final products = snapshot.data!.docs;
+        final allDocs = snapshot.data!.docs;
+
+        // 🚀 SAFELY FILTER OUT ARCHIVED PRODUCTS LOCALLY (NO INDEX REQUIRED)
+        final activeProducts = allDocs.where((doc) {
+          final data = doc.data() as Map<String, dynamic>;
+          final bool isArchived = data['isArchived'] ?? false;
+          return !isArchived;
+        }).toList();
+
+        if (activeProducts.isEmpty) {
+          return SizedBox(
+            height: 100,
+            child: Center(
+              child: Text(
+                "Coming soon!",
+                style: GoogleFonts.inter(
+                  color: Colors.grey,
+                  fontStyle: FontStyle.italic,
+                ),
+              ),
+            ),
+          );
+        }
 
         return SizedBox(
           height: 240,
@@ -581,10 +685,12 @@ class _HomeScreenState extends State<HomeScreen> {
             physics: const BouncingScrollPhysics(),
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
             scrollDirection: Axis.horizontal,
-            itemCount: products.length,
+            itemCount: activeProducts.length,
             itemBuilder: (context, index) {
               final productData =
-                  products[index].data() as Map<String, dynamic>;
+                  activeProducts[index].data() as Map<String, dynamic>;
+              productData['id'] = activeProducts[index].id;
+
               return Padding(
                 padding: const EdgeInsets.only(right: 15),
                 child: _buildProductCard(productData),
@@ -604,6 +710,9 @@ class _HomeScreenState extends State<HomeScreen> {
     final sold = product['sold']?.toString() ?? '0';
     final imageUrl = product['image']?.toString() ?? '';
     final name = product['name']?.toString() ?? 'Unknown Item';
+
+    // 🚀 CHECK IF PRODUCT IS OUT OF STOCK
+    final bool isOutOfStock = product['isOutOfStock'] ?? false;
 
     Widget productImageWidget() {
       if (imageUrl.isEmpty) return const Icon(Icons.image, color: Colors.grey);
@@ -664,37 +773,44 @@ class _HomeScreenState extends State<HomeScreen> {
                       child: productImageWidget(),
                     ),
                   ),
-                  Positioned(
-                    top: 10,
-                    right: 10,
-                    child: GestureDetector(
-                      onTap: () {
-                        HapticFeedback.selectionClick();
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text("Added to Favorites ❤️"),
-                          ),
-                        );
-                      },
+
+                  // 🚀 OUT OF STOCK VISUAL OVERLAY
+                  if (isOutOfStock)
+                    Positioned.fill(
                       child: Container(
-                        padding: const EdgeInsets.all(6),
                         decoration: BoxDecoration(
-                          color: Colors.white,
-                          shape: BoxShape.circle,
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.1),
-                              blurRadius: 5,
-                            ),
-                          ],
+                          color: Colors.white.withOpacity(0.6),
+                          borderRadius: const BorderRadius.vertical(
+                            top: Radius.circular(20),
+                          ),
                         ),
-                        child: Icon(
-                          Icons.favorite_border,
-                          size: 16,
-                          color: Colors.grey.shade400,
+                        child: Center(
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.red.shade700,
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              "SOLD OUT",
+                              style: GoogleFonts.inter(
+                                color: Colors.white,
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
                         ),
                       ),
                     ),
+
+                  Positioned(
+                    top: 10,
+                    right: 10,
+                    child: PersonalFavoriteButton(product: product),
                   ),
                 ],
               ),
@@ -744,24 +860,67 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                       ),
                       GestureDetector(
-                        onTap: () {
-                          HapticFeedback.lightImpact();
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text("Added $name to cart!"),
-                              backgroundColor: _petsyGreen,
-                              duration: const Duration(seconds: 2),
-                            ),
-                          );
-                        },
+                        // 🚀 PREVENT ADDING TO CART IF SOLD OUT
+                        onTap: isOutOfStock
+                            ? null
+                            : () {
+                                HapticFeedback.lightImpact();
+                                String defaultFlavor = "Standard";
+                                if (product['flavors'] != null &&
+                                    (product['flavors'] as List).isNotEmpty) {
+                                  defaultFlavor =
+                                      (product['flavors'] as List)[0];
+                                }
+                                String defaultSize = "Standard";
+                                if (product['sizes'] != null &&
+                                    (product['sizes'] as List).isNotEmpty) {
+                                  defaultSize = (product['sizes'] as List)[0];
+                                }
+
+                                context.read<CartProvider>().addToCart(
+                                  product,
+                                  1,
+                                  defaultFlavor,
+                                  defaultSize,
+                                  parsedPrice,
+                                );
+
+                                ScaffoldMessenger.of(
+                                  context,
+                                ).hideCurrentSnackBar();
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text("Added $name to cart!"),
+                                    backgroundColor: _petsyGreen,
+                                    duration: const Duration(seconds: 2),
+                                    action: SnackBarAction(
+                                      label: 'VIEW CART',
+                                      textColor: Colors.white,
+                                      onPressed: () {
+                                        Navigator.pushReplacement(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (context) =>
+                                                const CartScreen(),
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                  ),
+                                );
+                              },
                         child: Container(
                           padding: const EdgeInsets.all(6),
                           decoration: BoxDecoration(
-                            color: _petsyGreen,
+                            color: isOutOfStock
+                                ? Colors.grey.shade400
+                                : _petsyGreen,
                             borderRadius: BorderRadius.circular(8),
                           ),
-                          child: const Icon(
-                            Icons.add_shopping_cart,
+                          child: Icon(
+                            isOutOfStock
+                                ? Icons.block
+                                : Icons.add_shopping_cart,
                             color: Colors.white,
                             size: 16,
                           ),
@@ -789,10 +948,9 @@ class _HomeScreenState extends State<HomeScreen> {
           } else if (label == "Cart") {
             nextScreen = const CartScreen();
           } else if (label == "Orders") {
-            nextScreen =
-                const OrdersScreen(); // 🚀 POINTS TO THE REAL SCREEN NOW
+            nextScreen = const OrdersScreen();
           } else {
-            return; // Already on Home
+            return;
           }
 
           Navigator.pushReplacement(
@@ -862,6 +1020,88 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 }
 
+// ============================================================================
+// 🌟 NEW WIDGET: Personal Favorite Button 🌟
+// ============================================================================
+class PersonalFavoriteButton extends StatelessWidget {
+  final Map<String, dynamic> product;
+  const PersonalFavoriteButton({super.key, required this.product});
+
+  @override
+  Widget build(BuildContext context) {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null || product['id'] == null) {
+      return Container(
+        padding: const EdgeInsets.all(6),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          shape: BoxShape.circle,
+          boxShadow: [
+            BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 5),
+          ],
+        ),
+        child: Icon(
+          Icons.favorite_border,
+          size: 16,
+          color: Colors.grey.shade400,
+        ),
+      );
+    }
+
+    final docRef = FirebaseFirestore.instance
+        .collection('users')
+        .doc(user.uid)
+        .collection('favorites')
+        .doc(product['id']);
+
+    return StreamBuilder<DocumentSnapshot>(
+      stream: docRef.snapshots(),
+      builder: (context, snapshot) {
+        bool isFav = snapshot.hasData && snapshot.data!.exists;
+
+        return GestureDetector(
+          onTap: () async {
+            HapticFeedback.selectionClick();
+            if (isFav) {
+              await docRef.delete();
+              ScaffoldMessenger.of(context).hideCurrentSnackBar();
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text("Removed from personal favorites 💔"),
+                ),
+              );
+            } else {
+              await docRef.set(product);
+              ScaffoldMessenger.of(context).hideCurrentSnackBar();
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text("Added to personal favorites ❤️")),
+              );
+            }
+          },
+          child: Container(
+            padding: const EdgeInsets.all(6),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 5),
+              ],
+            ),
+            child: Icon(
+              isFav ? Icons.favorite : Icons.favorite_border,
+              size: 16,
+              color: isFav ? Colors.red : Colors.grey.shade400,
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+// ============================================================================
+// 🌟 PROMO CAROUSEL 🌟
+// ============================================================================
 class PromoCarouselWidget extends StatefulWidget {
   const PromoCarouselWidget({super.key});
 
@@ -1074,15 +1314,41 @@ class _PromoCarouselWidgetState extends State<PromoCarouselWidget> {
 }
 
 // ============================================================================
-// 🌟 FUNCTIONAL SUB-SCREENS 🌟
+// 🌟 LIVE SEARCH SCREEN 🌟
 // ============================================================================
-
-class SearchScreen extends StatelessWidget {
+class SearchScreen extends StatefulWidget {
   const SearchScreen({super.key});
+
+  @override
+  State<SearchScreen> createState() => _SearchScreenState();
+}
+
+class _SearchScreenState extends State<SearchScreen> {
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = "";
+  final Color _petsyGreen = const Color(0xFF2B8C61);
+  final Color _petsyNavy = const Color(0xFF003466);
+
+  @override
+  void initState() {
+    super.initState();
+    _searchController.addListener(() {
+      setState(() {
+        _searchQuery = _searchController.text.trim();
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: const Color(0xFFF8F9FA),
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
@@ -1091,6 +1357,7 @@ class SearchScreen extends StatelessWidget {
           onPressed: () => Navigator.pop(context),
         ),
         title: TextField(
+          controller: _searchController,
           autofocus: true,
           decoration: InputDecoration(
             hintText: "Search food, toys, accessories...",
@@ -1099,14 +1366,28 @@ class SearchScreen extends StatelessWidget {
               fontSize: 14,
             ),
             border: InputBorder.none,
+            suffixIcon: _searchQuery.isNotEmpty
+                ? IconButton(
+                    icon: const Icon(Icons.clear, color: Colors.grey),
+                    onPressed: () {
+                      _searchController.clear();
+                    },
+                  )
+                : null,
           ),
         ),
       ),
-      body: Center(
+      body: _buildBody(),
+    );
+  }
+
+  Widget _buildBody() {
+    if (_searchQuery.isEmpty) {
+      return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.search, size: 80, color: Colors.grey.shade200),
+            Icon(Icons.search, size: 80, color: Colors.grey.shade300),
             const SizedBox(height: 20),
             Text(
               "Type to start searching",
@@ -1117,10 +1398,317 @@ class SearchScreen extends StatelessWidget {
             ),
           ],
         ),
+      );
+    }
+
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance.collection('products').snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return Center(child: CircularProgressIndicator(color: _petsyGreen));
+        }
+
+        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+          return Center(
+            child: Text(
+              "No products available",
+              style: GoogleFonts.inter(color: Colors.grey),
+            ),
+          );
+        }
+
+        // 🚀 SAFELY FILTER OUT ARCHIVED PRODUCTS + MATCH SEARCH QUERY
+        final filteredDocs = snapshot.data!.docs.where((doc) {
+          final data = doc.data() as Map<String, dynamic>;
+          final bool isArchived = data['isArchived'] ?? false;
+          if (isArchived) return false;
+
+          final name = data['name']?.toString().toLowerCase() ?? '';
+          return name.contains(_searchQuery.toLowerCase());
+        }).toList();
+
+        if (filteredDocs.isEmpty) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.sentiment_dissatisfied,
+                  size: 60,
+                  color: Colors.grey.shade400,
+                ),
+                const SizedBox(height: 15),
+                Text(
+                  "No matches for '$_searchQuery'",
+                  style: GoogleFonts.inter(
+                    color: Colors.grey.shade600,
+                    fontSize: 16,
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
+
+        return GridView.builder(
+          padding: const EdgeInsets.all(20),
+          physics: const BouncingScrollPhysics(),
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 2,
+            childAspectRatio: 0.65,
+            crossAxisSpacing: 15,
+            mainAxisSpacing: 15,
+          ),
+          itemCount: filteredDocs.length,
+          itemBuilder: (context, index) {
+            final productData =
+                filteredDocs[index].data() as Map<String, dynamic>;
+            productData['id'] = filteredDocs[index].id;
+
+            return _buildGridProductCard(
+              context,
+              productData,
+              _petsyNavy,
+              _petsyGreen,
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildGridProductCard(
+    BuildContext context,
+    Map<String, dynamic> product,
+    Color navy,
+    Color green,
+  ) {
+    final rawPrice = product['price']?.toString() ?? '0.00';
+    final parsedPrice = double.tryParse(rawPrice) ?? 0.0;
+    final price = parsedPrice.toStringAsFixed(2);
+    final rating = product['rating']?.toString() ?? '0.0';
+    final sold = product['sold']?.toString() ?? '0';
+    final imageUrl = product['image']?.toString() ?? '';
+    final name = product['name']?.toString() ?? 'Unknown Item';
+
+    // 🚀 CHECK OUT OF STOCK
+    final bool isOutOfStock = product['isOutOfStock'] ?? false;
+
+    return GestureDetector(
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => ProductDetailsScreen(product: product),
+        ),
+      ),
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.04),
+              blurRadius: 15,
+              spreadRadius: 2,
+              offset: const Offset(0, 5),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Stack(
+                children: [
+                  Container(
+                    width: double.infinity,
+                    decoration: const BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.vertical(
+                        top: Radius.circular(20),
+                      ),
+                    ),
+                    padding: const EdgeInsets.all(12.0),
+                    child: Hero(
+                      tag: imageUrl.isNotEmpty
+                          ? "${imageUrl}search"
+                          : 'product_image_search',
+                      child: imageUrl.startsWith('http')
+                          ? Image.network(imageUrl, fit: BoxFit.contain)
+                          : Image.asset(
+                              imageUrl,
+                              fit: BoxFit.contain,
+                              errorBuilder: (c, e, s) =>
+                                  const Icon(Icons.image, color: Colors.grey),
+                            ),
+                    ),
+                  ),
+
+                  // 🚀 OUT OF STOCK VISUAL OVERLAY
+                  if (isOutOfStock)
+                    Positioned.fill(
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.6),
+                          borderRadius: const BorderRadius.vertical(
+                            top: Radius.circular(20),
+                          ),
+                        ),
+                        child: Center(
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.red.shade700,
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              "SOLD OUT",
+                              style: GoogleFonts.inter(
+                                color: Colors.white,
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+
+                  Positioned(
+                    top: 10,
+                    right: 10,
+                    child: PersonalFavoriteButton(product: product),
+                  ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(12.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    name,
+                    style: GoogleFonts.inter(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
+                      color: navy,
+                      height: 1.2,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      const Icon(Icons.star, color: Colors.amber, size: 12),
+                      const SizedBox(width: 4),
+                      Text(
+                        "$rating | $sold sold",
+                        style: GoogleFonts.inter(
+                          color: Colors.grey.shade600,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        "₱$price",
+                        style: GoogleFonts.inter(
+                          color: green,
+                          fontWeight: FontWeight.w900,
+                          fontSize: 16,
+                          letterSpacing: -0.5,
+                        ),
+                      ),
+                      GestureDetector(
+                        // 🚀 DISABLE CART ADD IF OUT OF STOCK
+                        onTap: isOutOfStock
+                            ? null
+                            : () {
+                                HapticFeedback.lightImpact();
+                                String defaultFlavor = "Standard";
+                                if (product['flavors'] != null &&
+                                    (product['flavors'] as List).isNotEmpty) {
+                                  defaultFlavor =
+                                      (product['flavors'] as List)[0];
+                                }
+                                String defaultSize = "Standard";
+                                if (product['sizes'] != null &&
+                                    (product['sizes'] as List).isNotEmpty) {
+                                  defaultSize = (product['sizes'] as List)[0];
+                                }
+
+                                context.read<CartProvider>().addToCart(
+                                  product,
+                                  1,
+                                  defaultFlavor,
+                                  defaultSize,
+                                  parsedPrice,
+                                );
+
+                                ScaffoldMessenger.of(
+                                  context,
+                                ).hideCurrentSnackBar();
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text("Added $name to cart!"),
+                                    backgroundColor: green,
+                                    duration: const Duration(seconds: 2),
+                                    action: SnackBarAction(
+                                      label: 'VIEW CART',
+                                      textColor: Colors.white,
+                                      onPressed: () {
+                                        Navigator.pushReplacement(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (context) =>
+                                                const CartScreen(),
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                  ),
+                                );
+                              },
+                        child: Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: BoxDecoration(
+                            color: isOutOfStock ? Colors.grey.shade400 : green,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Icon(
+                            isOutOfStock
+                                ? Icons.block
+                                : Icons.add_shopping_cart,
+                            color: Colors.white,
+                            size: 16,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 }
+
+// ============================================================================
+// 🌟 OTHER MINOR SUB-SCREENS 🌟
+// ============================================================================
 
 class FilterBottomSheet extends StatelessWidget {
   const FilterBottomSheet({super.key});
@@ -1232,8 +1820,30 @@ class NotificationsScreen extends StatelessWidget {
 class GenericProductsScreen extends StatelessWidget {
   final String title;
   const GenericProductsScreen({super.key, required this.title});
+
   @override
   Widget build(BuildContext context) {
+    final Color petsyGreen = const Color(0xFF2B8C61);
+    final Color petsyNavy = const Color(0xFF003466);
+
+    Query productsQuery = FirebaseFirestore.instance.collection('products');
+
+    if (title == "Best Sellers") {
+      productsQuery = productsQuery.where('isBestSeller', isEqualTo: true);
+    } else if (title == "What's New") {
+      productsQuery = productsQuery.where('isNew', isEqualTo: true);
+    } else if (title == "Petsy Favorites") {
+      productsQuery = productsQuery.where('isFavorite', isEqualTo: true);
+    } else if (title.contains("Dog")) {
+      productsQuery = productsQuery.where('animalCategory', isEqualTo: 'Dog');
+    } else if (title.contains("Cat")) {
+      productsQuery = productsQuery.where('animalCategory', isEqualTo: 'Cat');
+    } else if (title.contains("Fish")) {
+      productsQuery = productsQuery.where('animalCategory', isEqualTo: 'Fish');
+    } else if (title.contains("Birds")) {
+      productsQuery = productsQuery.where('animalCategory', isEqualTo: 'Birds');
+    }
+
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FA),
       appBar: AppBar(
@@ -1248,10 +1858,298 @@ class GenericProductsScreen extends StatelessWidget {
         ),
         leading: const BackButton(color: Colors.black87),
       ),
-      body: Center(
-        child: Text(
-          "$title list coming soon!",
-          style: GoogleFonts.inter(color: Colors.grey, fontSize: 16),
+
+      body: StreamBuilder<QuerySnapshot>(
+        stream: productsQuery.snapshots(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return Center(child: CircularProgressIndicator(color: petsyGreen));
+          }
+
+          if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+            return _buildEmptyState(title);
+          }
+
+          final allDocs = snapshot.data!.docs;
+
+          // 🚀 SAFELY FILTER OUT ARCHIVED PRODUCTS LOCALLY
+          final activeProducts = allDocs.where((doc) {
+            final data = doc.data() as Map<String, dynamic>;
+            final bool isArchived = data['isArchived'] ?? false;
+            return !isArchived;
+          }).toList();
+
+          if (activeProducts.isEmpty) {
+            return _buildEmptyState(title);
+          }
+
+          return GridView.builder(
+            padding: const EdgeInsets.all(20),
+            physics: const BouncingScrollPhysics(),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              childAspectRatio: 0.65,
+              crossAxisSpacing: 15,
+              mainAxisSpacing: 15,
+            ),
+            itemCount: activeProducts.length,
+            itemBuilder: (context, index) {
+              final productData =
+                  activeProducts[index].data() as Map<String, dynamic>;
+              productData['id'] = activeProducts[index].id;
+
+              return _buildGridProductCard(
+                context,
+                productData,
+                petsyNavy,
+                petsyGreen,
+              );
+            },
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildEmptyState(String title) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.inventory_2_outlined,
+            size: 80,
+            color: Colors.grey.shade300,
+          ),
+          const SizedBox(height: 15),
+          Text(
+            "No products found for $title",
+            style: GoogleFonts.inter(color: Colors.grey.shade500, fontSize: 16),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildGridProductCard(
+    BuildContext context,
+    Map<String, dynamic> product,
+    Color navy,
+    Color green,
+  ) {
+    final rawPrice = product['price']?.toString() ?? '0.00';
+    final parsedPrice = double.tryParse(rawPrice) ?? 0.0;
+    final price = parsedPrice.toStringAsFixed(2);
+    final rating = product['rating']?.toString() ?? '0.0';
+    final sold = product['sold']?.toString() ?? '0';
+    final imageUrl = product['image']?.toString() ?? '';
+    final name = product['name']?.toString() ?? 'Unknown Item';
+
+    // 🚀 CHECK OUT OF STOCK
+    final bool isOutOfStock = product['isOutOfStock'] ?? false;
+
+    return GestureDetector(
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => ProductDetailsScreen(product: product),
+        ),
+      ),
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.04),
+              blurRadius: 15,
+              spreadRadius: 2,
+              offset: const Offset(0, 5),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Stack(
+                children: [
+                  Container(
+                    width: double.infinity,
+                    decoration: const BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.vertical(
+                        top: Radius.circular(20),
+                      ),
+                    ),
+                    padding: const EdgeInsets.all(12.0),
+                    child: Hero(
+                      tag: imageUrl.isNotEmpty
+                          ? imageUrl + title
+                          : 'product_image_$title',
+                      child: imageUrl.startsWith('http')
+                          ? Image.network(imageUrl, fit: BoxFit.contain)
+                          : Image.asset(
+                              imageUrl,
+                              fit: BoxFit.contain,
+                              errorBuilder: (c, e, s) =>
+                                  const Icon(Icons.image, color: Colors.grey),
+                            ),
+                    ),
+                  ),
+
+                  // 🚀 OUT OF STOCK VISUAL OVERLAY
+                  if (isOutOfStock)
+                    Positioned.fill(
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.6),
+                          borderRadius: const BorderRadius.vertical(
+                            top: Radius.circular(20),
+                          ),
+                        ),
+                        child: Center(
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.red.shade700,
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              "SOLD OUT",
+                              style: GoogleFonts.inter(
+                                color: Colors.white,
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+
+                  Positioned(
+                    top: 10,
+                    right: 10,
+                    child: PersonalFavoriteButton(product: product),
+                  ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(12.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    name,
+                    style: GoogleFonts.inter(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
+                      color: navy,
+                      height: 1.2,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      const Icon(Icons.star, color: Colors.amber, size: 12),
+                      const SizedBox(width: 4),
+                      Text(
+                        "$rating | $sold sold",
+                        style: GoogleFonts.inter(
+                          color: Colors.grey.shade600,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        "₱$price",
+                        style: GoogleFonts.inter(
+                          color: green,
+                          fontWeight: FontWeight.w900,
+                          fontSize: 16,
+                          letterSpacing: -0.5,
+                        ),
+                      ),
+                      GestureDetector(
+                        // 🚀 DISABLE CART ADD IF OUT OF STOCK
+                        onTap: isOutOfStock
+                            ? null
+                            : () {
+                                HapticFeedback.lightImpact();
+                                String defaultFlavor = "Standard";
+                                if (product['flavors'] != null &&
+                                    (product['flavors'] as List).isNotEmpty) {
+                                  defaultFlavor =
+                                      (product['flavors'] as List)[0];
+                                }
+                                String defaultSize = "Standard";
+                                if (product['sizes'] != null &&
+                                    (product['sizes'] as List).isNotEmpty) {
+                                  defaultSize = (product['sizes'] as List)[0];
+                                }
+
+                                context.read<CartProvider>().addToCart(
+                                  product,
+                                  1,
+                                  defaultFlavor,
+                                  defaultSize,
+                                  parsedPrice,
+                                );
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text("Added $name to cart!"),
+                                    backgroundColor: green,
+                                    duration: const Duration(seconds: 2),
+                                    action: SnackBarAction(
+                                      label: 'VIEW CART',
+                                      textColor: Colors.white,
+                                      onPressed: () {
+                                        Navigator.pushReplacement(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (context) =>
+                                                const CartScreen(),
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                  ),
+                                );
+                              },
+                        child: Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: BoxDecoration(
+                            color: isOutOfStock ? Colors.grey.shade400 : green,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Icon(
+                            isOutOfStock
+                                ? Icons.block
+                                : Icons.add_shopping_cart,
+                            color: Colors.white,
+                            size: 16,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );

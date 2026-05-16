@@ -5,12 +5,22 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:flutter/services.dart';
 
+// 🚀 NOTIFICATION SERVICE
+import 'package:petsy/services/notification_service_enhanced.dart';
+
+// --- Ensure these paths match your project structure ---
 import 'package:petsy/features/home/presentation/screens/edit_profile_screen.dart';
 import 'package:petsy/features/home/presentation/screens/home_screen.dart';
+import 'package:petsy/features/home/presentation/screens/cart_screen.dart';
+import 'package:petsy/features/home/presentation/screens/orders_screen.dart';
 import 'package:petsy/features/auth/presentation/screens/sign_in_screen.dart';
-// Make sure this path matches where you saved the new admin screen!
-import 'package:petsy/features/admin/presentation/screens/manage_products_screen.dart';
+import 'package:petsy/features/admin/presentation/screens/admin_dashboard_screen.dart';
+
+// 🚀 NEW FUNCTIONAL ROUTES
+import 'package:petsy/features/home/presentation/screens/customer_chat_list_screen.dart';
+import 'package:petsy/features/home/presentation/screens/shipping_address_screen.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -22,12 +32,13 @@ class ProfilePage extends StatefulWidget {
 class _ProfilePageState extends State<ProfilePage> {
   final User? currentUser = FirebaseAuth.instance.currentUser;
 
-  // Theme Colors
-  final Color _petsyGreen = const Color(0xFF339967);
+  final Color _petsyGreen = const Color(0xFF2B8C61);
   final Color _petsyNavy = const Color(0xFF003466);
-  final Color _lightGray = const Color(0xFFF8F9FA);
+  final Color _lightGray = const Color(0xFFF4F6F8);
+  final Color _bottomNavBg = const Color(0xFFE2E2E2);
 
   Future<void> _signOut() async {
+    HapticFeedback.mediumImpact();
     await FirebaseAuth.instance.signOut();
     if (mounted) {
       Navigator.of(context).pushAndRemoveUntil(
@@ -45,6 +56,7 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   void _shareProfile() {
+    HapticFeedback.selectionClick();
     Share.share(
       'Check out my Petsy profile! @${currentUser?.displayName ?? 'user'}',
     );
@@ -56,56 +68,140 @@ class _ProfilePageState extends State<ProfilePage> {
     if (userData['phone'] != null && userData['phone'].toString().isNotEmpty) {
       score += 0.25;
     }
-    if (userData['address'] != null && userData['address']['region'] != null) {
+    if (userData['address'] != null && userData['address']['city'] != null) {
       score += 0.25;
     }
     return score;
   }
 
+  // Generic navigation to sub-screens created at the bottom of this file
+  void _navigateToLocalScreen(Widget screen) {
+    HapticFeedback.selectionClick();
+    Navigator.push(context, MaterialPageRoute(builder: (_) => screen));
+  }
+
+  // 🚀 TEST: CHAT NOTIFICATION
+  Future<void> _testChatNotification() async {
+    HapticFeedback.selectionClick();
+    try {
+      await NotificationService().sendChatNotification(
+        recipientId: currentUser!.uid,
+        senderName: '👨‍💼 Admin Support',
+        messagePreview: 'Your order will arrive today! 📦',
+        orderId: 'TEST-ORDER-001',
+      );
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('✅ Chat notification sent!'),
+            backgroundColor: _petsyGreen,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('❌ Error: $e')));
+      }
+    }
+  }
+
+  // 🚀 TEST: ORDER NOTIFICATION
+  Future<void> _testOrderNotification() async {
+    HapticFeedback.selectionClick();
+    try {
+      await NotificationService().sendOrderStatusNotification(
+        customerId: currentUser!.uid,
+        orderId: 'TEST-ORDER-001',
+        orderStatus: 'toShip',
+        totalAmount: 1250.00,
+      );
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('✅ Order notification sent!'),
+            backgroundColor: _petsyGreen,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('❌ Error: $e')));
+      }
+    }
+  }
+
+  // 🚀 TEST: PAYMENT NOTIFICATION
+  Future<void> _testPaymentNotification() async {
+    HapticFeedback.selectionClick();
+    try {
+      await NotificationService().sendPaymentNotification(
+        userId: currentUser!.uid,
+        transactionId: 'TXN-TEST-${DateTime.now().millisecond}',
+        amount: 1250.00,
+        paymentMethod: 'GCash',
+        isSuccess: true,
+      );
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('✅ Payment notification sent!'),
+            backgroundColor: _petsyGreen,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('❌ Error: $e')));
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     if (currentUser == null) {
-      return const Scaffold(body: Center(child: Text("No user logged in")));
+      return Scaffold(
+        backgroundColor: _lightGray,
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.person_off, size: 60, color: Colors.grey.shade400),
+              const SizedBox(height: 15),
+              Text(
+                "No user logged in",
+                style: GoogleFonts.inter(
+                  color: Colors.grey.shade600,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 20),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(backgroundColor: _petsyGreen),
+                onPressed: _signOut,
+                child: Text(
+                  "Return to Login",
+                  style: GoogleFonts.inter(color: Colors.white),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
     }
 
     return Scaffold(
       extendBody: true,
       backgroundColor: _lightGray,
-
-      // --- REVISED CUSTOM NAVIGATION BAR ---
-      bottomNavigationBar: Container(
-        height: 90, // Total height to allow the active circle to pop out
-        color: Colors.transparent,
-        child: Stack(
-          alignment: Alignment.bottomCenter, // Automatically anchors to bottom
-          clipBehavior: Clip.none,
-          children: [
-            // 1. Solid Gray Background Bar
-            Container(
-              height: 65, // Height of the gray area
-              color: const Color(0xFFD9D9D9),
-            ),
-
-            // 2. Navigation Items
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                _buildNavItem(Icons.home_outlined, "Home", false),
-                _buildNavItem(Icons.shopping_cart_outlined, "Cart", false),
-                _buildNavItem(Icons.format_list_bulleted, "Orders", false),
-                _buildNavItem(
-                  Icons.person_outline,
-                  "Profile",
-                  true,
-                ), // Active Item
-              ],
-            ),
-          ],
-        ),
-      ),
-
-      // --- MAIN BODY ---
+      bottomNavigationBar: _buildCustomBottomNav(),
       body: StreamBuilder<DocumentSnapshot>(
         stream: FirebaseFirestore.instance
             .collection('users')
@@ -126,10 +222,13 @@ class _ProfilePageState extends State<ProfilePage> {
               ),
             );
           }
+
           if (snapshot.hasError ||
               !snapshot.hasData ||
               !snapshot.data!.exists) {
-            return const Center(child: Text("Error loading profile"));
+            return const Center(
+              child: Text("Error loading profile. Please restart the app."),
+            );
           }
 
           final userData = snapshot.data!.data() as Map<String, dynamic>;
@@ -140,19 +239,17 @@ class _ProfilePageState extends State<ProfilePage> {
           final String displayUsername = userData['username'] != null
               ? "@${userData['username']}"
               : "@user";
-
           final double completionScore = _calculateProfileCompletion(userData);
           final Timestamp? createdAt = userData['createdAt'] as Timestamp?;
           final String joinedDate = createdAt != null
               ? "Joined ${createdAt.toDate().year}"
               : "New Member";
-
-          // 👇 THE MAGIC ADMIN CHECK 👇
           final bool isAdmin = userData['isAdmin'] == true;
 
           return CustomScrollView(
             physics: const BouncingScrollPhysics(),
             slivers: [
+              // --- PREMIUM HEADER ---
               SliverToBoxAdapter(
                 child: Container(
                   padding: const EdgeInsets.only(bottom: 30),
@@ -202,29 +299,115 @@ class _ProfilePageState extends State<ProfilePage> {
                                   ),
                                 ),
                               ),
+
                               Align(
                                 alignment: Alignment.centerRight,
                                 child: Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    IconButton(
-                                      icon: const Icon(
-                                        Icons.chat_bubble_outline,
-                                        color: Colors.white,
-                                      ),
-                                      onPressed: () {},
-                                      padding: EdgeInsets.zero,
-                                      constraints: const BoxConstraints(),
+                                    // 🚀 ROUTED TO NEW CUSTOMER CHAT LIST (INBOX)
+                                    StreamBuilder<QuerySnapshot>(
+                                      stream: FirebaseFirestore.instance
+                                          .collection('chats')
+                                          .where(
+                                            'customerId',
+                                            isEqualTo: currentUser!.uid,
+                                          )
+                                          .snapshots(),
+                                      builder: (context, chatSnap) {
+                                        bool hasUnreadReply = false;
+                                        if (chatSnap.hasData) {
+                                          for (var doc in chatSnap.data!.docs) {
+                                            final lastMsg =
+                                                (doc.data()
+                                                        as Map)['lastMessage']
+                                                    ?.toString() ??
+                                                '';
+                                            if (lastMsg.startsWith("Admin:")) {
+                                              hasUnreadReply = true;
+                                            }
+                                          }
+                                        }
+
+                                        return GestureDetector(
+                                          onTap: () {
+                                            HapticFeedback.selectionClick();
+                                            Navigator.push(
+                                              context,
+                                              MaterialPageRoute(
+                                                builder: (_) =>
+                                                    const CustomerChatListScreen(),
+                                              ),
+                                            );
+                                          },
+                                          child: Container(
+                                            padding: const EdgeInsets.all(8),
+                                            decoration: BoxDecoration(
+                                              color: Colors.white.withOpacity(
+                                                0.2,
+                                              ),
+                                              shape: BoxShape.circle,
+                                              border: Border.all(
+                                                color: Colors.white.withOpacity(
+                                                  0.4,
+                                                ),
+                                                width: 1,
+                                              ),
+                                            ),
+                                            child: Stack(
+                                              clipBehavior: Clip.none,
+                                              children: [
+                                                const Icon(
+                                                  Icons.forum_outlined,
+                                                  color: Colors.white,
+                                                  size: 20,
+                                                ), // Changed to Forum icon for Inbox
+                                                if (hasUnreadReply)
+                                                  Positioned(
+                                                    top: -2,
+                                                    right: -2,
+                                                    child: Container(
+                                                      height: 10,
+                                                      width: 10,
+                                                      decoration: BoxDecoration(
+                                                        color: Colors.redAccent,
+                                                        shape: BoxShape.circle,
+                                                        border: Border.all(
+                                                          color: _petsyNavy,
+                                                          width: 2,
+                                                        ),
+                                                      ),
+                                                    ),
+                                                  ),
+                                              ],
+                                            ),
+                                          ),
+                                        );
+                                      },
                                     ),
-                                    const SizedBox(width: 15),
-                                    IconButton(
-                                      icon: const Icon(
-                                        Icons.settings_outlined,
-                                        color: Colors.white,
+                                    const SizedBox(width: 12),
+                                    GestureDetector(
+                                      onTap: () => _navigateToLocalScreen(
+                                        const LocalSettingsScreen(),
                                       ),
-                                      onPressed: () {},
-                                      padding: EdgeInsets.zero,
-                                      constraints: const BoxConstraints(),
+                                      child: Container(
+                                        padding: const EdgeInsets.all(8),
+                                        decoration: BoxDecoration(
+                                          color: Colors.white.withOpacity(0.2),
+                                          shape: BoxShape.circle,
+                                          border: Border.all(
+                                            color: Colors.white.withOpacity(
+                                              0.4,
+                                            ),
+                                            width: 1,
+                                          ),
+                                        ),
+                                        child: const Icon(
+                                          Icons.settings_outlined,
+                                          color: Colors.white,
+                                          size: 20,
+                                        ),
+                                      ),
                                     ),
                                   ],
                                 ),
@@ -232,9 +415,9 @@ class _ProfilePageState extends State<ProfilePage> {
                             ],
                           ),
                         ),
-
                         const SizedBox(height: 10),
 
+                        // USER AVATAR
                         Stack(
                           alignment: Alignment.bottomRight,
                           children: [
@@ -264,33 +447,46 @@ class _ProfilePageState extends State<ProfilePage> {
                                     : null,
                               ),
                             ),
-                            Container(
-                              padding: const EdgeInsets.all(8),
-                              decoration: BoxDecoration(
-                                color: _petsyGreen,
-                                shape: BoxShape.circle,
-                                border: Border.all(
-                                  color: Colors.white,
-                                  width: 2,
-                                ),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withOpacity(0.2),
-                                    blurRadius: 5,
+                            GestureDetector(
+                              onTap: () {
+                                HapticFeedback.lightImpact();
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) =>
+                                        EditProfileScreen(userData: userData),
                                   ),
-                                ],
-                              ),
-                              child: const Icon(
-                                Icons.camera_alt,
-                                color: Colors.white,
-                                size: 16,
+                                );
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: _petsyGreen,
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: Colors.white,
+                                    width: 2,
+                                  ),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withOpacity(0.2),
+                                      blurRadius: 5,
+                                    ),
+                                  ],
+                                ),
+                                child: const Icon(
+                                  Icons.camera_alt,
+                                  color: Colors.white,
+                                  size: 16,
+                                ),
                               ),
                             ),
                           ],
                         ),
                         const SizedBox(height: 15),
+
                         Text(
-                          fullName.isEmpty ? "User" : fullName,
+                          fullName.isEmpty ? "Petsy User" : fullName,
                           style: GoogleFonts.inter(
                             color: Colors.white,
                             fontSize: 22,
@@ -306,6 +502,7 @@ class _ProfilePageState extends State<ProfilePage> {
                         ),
                         const SizedBox(height: 25),
 
+                        // GLASSMORPHISM STATS BAR
                         Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 20),
                           child: ClipRRect(
@@ -327,19 +524,43 @@ class _ProfilePageState extends State<ProfilePage> {
                                   mainAxisAlignment:
                                       MainAxisAlignment.spaceEvenly,
                                   children: [
-                                    _buildStatItem("29", "Followers"),
+                                    _buildStatItem(
+                                      "0",
+                                      "Favorites",
+                                      () => Navigator.pushReplacement(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (_) => const OrdersScreen(),
+                                        ),
+                                      ),
+                                    ), // Directs to Orders where Favorites tab is
                                     Container(
                                       height: 40,
                                       width: 1,
                                       color: Colors.white.withOpacity(0.3),
                                     ),
-                                    _buildStatItem("40", "Following"),
+                                    _buildStatItem(
+                                      "0",
+                                      "Reviews",
+                                      () => _navigateToLocalScreen(
+                                        const LocalReviewsScreen(),
+                                      ),
+                                    ),
                                     Container(
                                       height: 40,
                                       width: 1,
                                       color: Colors.white.withOpacity(0.3),
                                     ),
-                                    _buildStatItem("102", "Orders"),
+                                    _buildStatItem(
+                                      "Orders",
+                                      "",
+                                      () => Navigator.pushReplacement(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (_) => const OrdersScreen(),
+                                        ),
+                                      ),
+                                    ),
                                   ],
                                 ),
                               ),
@@ -352,6 +573,7 @@ class _ProfilePageState extends State<ProfilePage> {
                 ),
               ),
 
+              // --- SCROLLABLE SETTINGS & INFO ---
               SliverToBoxAdapter(
                 child: Padding(
                   padding: const EdgeInsets.all(20),
@@ -367,6 +589,7 @@ class _ProfilePageState extends State<ProfilePage> {
                               style: GoogleFonts.inter(
                                 fontWeight: FontWeight.bold,
                                 fontSize: 14,
+                                color: _petsyNavy,
                               ),
                             ),
                             Text(
@@ -381,13 +604,23 @@ class _ProfilePageState extends State<ProfilePage> {
                         const SizedBox(height: 8),
                         ClipRRect(
                           borderRadius: BorderRadius.circular(10),
-                          child: LinearProgressIndicator(
-                            value: completionScore,
-                            backgroundColor: Colors.grey.shade300,
-                            valueColor: AlwaysStoppedAnimation<Color>(
-                              _petsyGreen,
+                          child: TweenAnimationBuilder<double>(
+                            duration: const Duration(milliseconds: 1000),
+                            curve: Curves.easeOutCubic,
+                            tween: Tween<double>(
+                              begin: 0,
+                              end: completionScore,
                             ),
-                            minHeight: 8,
+                            builder: (context, value, _) {
+                              return LinearProgressIndicator(
+                                value: value,
+                                backgroundColor: Colors.grey.shade300,
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  _petsyGreen,
+                                ),
+                                minHeight: 8,
+                              );
+                            },
                           ),
                         ),
                         const SizedBox(height: 25),
@@ -407,21 +640,24 @@ class _ProfilePageState extends State<ProfilePage> {
                                 ),
                                 elevation: 0,
                               ),
-                              onPressed: () => Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) =>
-                                      EditProfileScreen(userData: userData),
-                                ),
-                              ),
+                              onPressed: () {
+                                HapticFeedback.lightImpact();
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) =>
+                                        EditProfileScreen(userData: userData),
+                                  ),
+                                );
+                              },
                               icon: const Icon(
                                 Icons.edit_outlined,
                                 color: Colors.white,
                                 size: 18,
                               ),
-                              label: const Text(
+                              label: Text(
                                 "Edit Profile",
-                                style: TextStyle(
+                                style: GoogleFonts.inter(
                                   color: Colors.white,
                                   fontWeight: FontWeight.bold,
                                 ),
@@ -451,7 +687,7 @@ class _ProfilePageState extends State<ProfilePage> {
                               ),
                               label: Text(
                                 "Share",
-                                style: TextStyle(
+                                style: GoogleFonts.inter(
                                   color: _petsyGreen,
                                   fontWeight: FontWeight.bold,
                                 ),
@@ -460,8 +696,52 @@ class _ProfilePageState extends State<ProfilePage> {
                           ),
                         ],
                       ),
-
                       const SizedBox(height: 30),
+
+                      if (isAdmin) ...[
+                        Text(
+                          "Admin Controls",
+                          style: GoogleFonts.inter(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.grey.shade600,
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        Container(
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                              color: Colors.amber.shade400,
+                              width: 1.5,
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.amber.withOpacity(0.1),
+                                blurRadius: 10,
+                                offset: const Offset(0, 5),
+                              ),
+                            ],
+                          ),
+                          child: _buildMenuTile(
+                            Icons.admin_panel_settings,
+                            "Admin Dashboard",
+                            subtitle: "Manage inventory, orders & users",
+                            iconColor: Colors.amber.shade700,
+                            onTap: () {
+                              HapticFeedback.selectionClick();
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => const AdminDashboardScreen(),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                        const SizedBox(height: 25),
+                      ],
 
                       Text(
                         "Account Settings",
@@ -489,23 +769,41 @@ class _ProfilePageState extends State<ProfilePage> {
                             _buildMenuTile(
                               Icons.person_outline,
                               "Personal Information",
+                              onTap: () => Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) =>
+                                      EditProfileScreen(userData: userData),
+                                ),
+                              ),
                             ),
                             _buildDivider(),
+
+                            // 🚀 FULLY FUNCTIONAL SHIPPING ADDRESS SCREEN
                             _buildMenuTile(
                               Icons.location_on_outlined,
                               "Shipping Addresses",
                               subtitle: "Manage delivery locations",
+                              onTap: () => Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => const ShippingAddressScreen(),
+                                ),
+                              ),
                             ),
+
                             _buildDivider(),
                             _buildMenuTile(
                               Icons.credit_card_outlined,
                               "Payment Methods",
                               subtitle: "Visa, GCash, Maya",
+                              onTap: () => _navigateToLocalScreen(
+                                const LocalPaymentScreen(),
+                              ),
                             ),
                           ],
                         ),
                       ),
-
                       const SizedBox(height: 25),
 
                       Text(
@@ -534,69 +832,78 @@ class _ProfilePageState extends State<ProfilePage> {
                             _buildMenuTile(
                               Icons.notifications_none_outlined,
                               "Notifications",
+                              onTap: () => _navigateToLocalScreen(
+                                const LocalSettingsScreen(),
+                              ),
                             ),
                             _buildDivider(),
                             _buildMenuTile(
                               Icons.security_outlined,
                               "Privacy & Security",
+                              onTap: () => _navigateToLocalScreen(
+                                const LocalSettingsScreen(),
+                              ),
                             ),
                             _buildDivider(),
-                            _buildMenuTile(Icons.help_outline, "Help Center"),
+                            _buildMenuTile(
+                              Icons.help_outline,
+                              "Help Center",
+                              onTap: () => _navigateToLocalScreen(
+                                const LocalHelpScreen(),
+                              ),
+                            ),
                           ],
                         ),
                       ),
+                      const SizedBox(height: 30),
 
-                      // --- 🛡️ ADMIN CONTROLS SECTION 🛡️ ---
-                      // This section will ONLY build if the logged in user has isAdmin: true in Firebase
-                      if (isAdmin) ...[
-                        const SizedBox(height: 25),
-                        Text(
-                          "Admin Controls",
-                          style: GoogleFonts.inter(
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.orange.shade700,
-                          ),
+                      // 🚀 TEST NOTIFICATIONS SECTION
+                      Text(
+                        "Testing",
+                        style: GoogleFonts.inter(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.grey.shade600,
                         ),
-                        const SizedBox(height: 10),
-                        Container(
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(20),
-                            border: Border.all(
-                              color: Colors.orange.shade200,
-                              width: 1.5,
+                      ),
+                      const SizedBox(height: 10),
+                      Container(
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(20),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.03),
+                              blurRadius: 10,
+                              offset: const Offset(0, 5),
                             ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.03),
-                                blurRadius: 10,
-                                offset: const Offset(0, 5),
-                              ),
-                            ],
-                          ),
-                          child: Column(
-                            children: [
-                              _buildMenuTile(
-                                Icons.inventory_2_outlined,
-                                "Manage Store Products",
-                                subtitle: "Add, upload, and edit items",
-                                onTap: () {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (context) =>
-                                          const ManageProductsScreen(),
-                                    ),
-                                  );
-                                },
-                              ),
-                            ],
-                          ),
+                          ],
                         ),
-                      ],
-
-                      // ----------------------------------------
+                        child: Column(
+                          children: [
+                            _buildMenuTile(
+                              Icons.chat_bubble_outline,
+                              "Test Chat Notification",
+                              subtitle: "Send a test message notification",
+                              onTap: () => _testChatNotification(),
+                            ),
+                            _buildDivider(),
+                            _buildMenuTile(
+                              Icons.shopping_bag_outlined,
+                              "Test Order Notification",
+                              subtitle: "Send a test order update",
+                              onTap: () => _testOrderNotification(),
+                            ),
+                            _buildDivider(),
+                            _buildMenuTile(
+                              Icons.payment_outlined,
+                              "Test Payment Notification",
+                              subtitle: "Send a test payment confirmation",
+                              onTap: () => _testPaymentNotification(),
+                            ),
+                          ],
+                        ),
+                      ),
                       const SizedBox(height: 30),
 
                       SizedBox(
@@ -620,10 +927,7 @@ class _ProfilePageState extends State<ProfilePage> {
                           ),
                         ),
                       ),
-
-                      const SizedBox(
-                        height: 120,
-                      ), // Extra padding to scroll past the new nav bar
+                      const SizedBox(height: 120),
                     ],
                   ),
                 ),
@@ -637,96 +941,128 @@ class _ProfilePageState extends State<ProfilePage> {
 
   // --- HELPER METHODS ---
 
-  // Helper Widget for Bottom Nav Bar Items
-  Widget _buildNavItem(IconData icon, String label, bool isActive) {
-    return GestureDetector(
-      onTap: () {
-        if (!isActive) {
-          if (label == "Home") {
-            Navigator.pushReplacement(
-              context,
-              PageRouteBuilder(
-                pageBuilder: (context, animation, secondaryAnimation) =>
-                    const HomeScreen(),
-                transitionsBuilder:
-                    (context, animation, secondaryAnimation, child) {
-                      return FadeTransition(opacity: animation, child: child);
-                    },
-                transitionDuration: const Duration(milliseconds: 300),
-              ),
-            );
-          }
-          // Add logic for Cart and Orders later
-        }
-      },
-      child: SizedBox(
-        width: 70,
-        height: 85, // Total height to accommodate the circle pop-up
-        child: Stack(
-          alignment: Alignment.bottomCenter,
-          children: [
-            // Inactive State (Icon + Text)
-            if (!isActive)
-              Positioned(
-                bottom: 12,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(icon, color: Colors.black87, size: 26),
-                    const SizedBox(height: 2),
-                    Text(
-                      label,
-                      style: GoogleFonts.inter(
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.black87,
-                      ),
-                    ),
-                  ],
+  Widget _buildCustomBottomNav() {
+    return Container(
+      height: 90,
+      color: Colors.transparent,
+      child: Stack(
+        alignment: Alignment.bottomCenter,
+        clipBehavior: Clip.none,
+        children: [
+          Container(height: 70, decoration: BoxDecoration(color: _bottomNavBg)),
+          Padding(
+            padding: const EdgeInsets.only(bottom: 15),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                _buildNavItem(
+                  Icons.home_outlined,
+                  "Home",
+                  false,
+                  () => Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(builder: (_) => const HomeScreen()),
+                  ),
                 ),
-              ),
-            // Active State (Green Circle pop-up)
-            if (isActive)
-              Positioned(
-                top: 0, // Pushes it out of the gray box
-                child: Container(
-                  height: 60,
-                  width: 60,
+                _buildNavItem(
+                  Icons.shopping_cart_outlined,
+                  "Cart",
+                  false,
+                  () => Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(builder: (_) => const CartScreen()),
+                  ),
+                ),
+                _buildNavItem(
+                  Icons.format_list_bulleted,
+                  "Orders",
+                  false,
+                  () => Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(builder: (_) => const OrdersScreen()),
+                  ),
+                ),
+                Container(
+                  height: 65,
+                  width: 65,
+                  margin: const EdgeInsets.only(bottom: 5),
                   decoration: BoxDecoration(
                     color: _petsyGreen,
                     shape: BoxShape.circle,
-                    border: Border.all(color: Colors.white, width: 3),
+                    border: Border.all(color: _bottomNavBg, width: 4),
                   ),
-                  child: Icon(icon, color: Colors.white, size: 30),
+                  child: const Icon(
+                    Icons.person_outline,
+                    color: Colors.white,
+                    size: 28,
+                  ),
                 ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildNavItem(
+    IconData icon,
+    String label,
+    bool isActive,
+    VoidCallback onTap,
+  ) {
+    return GestureDetector(
+      onTap: onTap,
+      child: SizedBox(
+        width: 70,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, color: Colors.black87, size: 28),
+            const SizedBox(height: 2),
+            Text(
+              label,
+              style: GoogleFonts.inter(
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                color: Colors.black87,
               ),
+            ),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildStatItem(String number, String label) {
-    return Column(
-      children: [
-        Text(
-          number,
-          style: GoogleFonts.inter(
-            color: Colors.white,
-            fontSize: 20,
-            fontWeight: FontWeight.w800,
+  Widget _buildStatItem(String number, String label, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: () {
+        HapticFeedback.lightImpact();
+        onTap();
+      },
+      child: Column(
+        children: [
+          Text(
+            number,
+            style: GoogleFonts.inter(
+              color: Colors.white,
+              fontSize: 20,
+              fontWeight: FontWeight.w900,
+            ),
           ),
-        ),
-        const SizedBox(height: 2),
-        Text(
-          label,
-          style: GoogleFonts.inter(
-            color: Colors.white.withOpacity(0.8),
-            fontSize: 11,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-      ],
+          if (label.isNotEmpty) const SizedBox(height: 2),
+          if (label.isNotEmpty)
+            Text(
+              label,
+              style: GoogleFonts.inter(
+                color: Colors.white.withOpacity(0.8),
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+        ],
+      ),
     );
   }
 
@@ -735,44 +1071,42 @@ class _ProfilePageState extends State<ProfilePage> {
     String title, {
     String? subtitle,
     VoidCallback? onTap,
+    Color? iconColor,
   }) {
-    return ListTile(
-      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-      leading: Container(
-        padding: const EdgeInsets.all(10),
-        decoration: BoxDecoration(
-          color: _lightGray,
-          borderRadius: BorderRadius.circular(12),
+    final finalIconColor = iconColor ?? _petsyNavy;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(20),
+      child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+        leading: Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: finalIconColor.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Icon(icon, color: finalIconColor, size: 22),
         ),
-        child: Icon(icon, color: _petsyNavy, size: 22),
-      ),
-      title: Text(
-        title,
-        style: GoogleFonts.inter(
-          color: Colors.black87,
-          fontSize: 15,
-          fontWeight: FontWeight.w600,
+        title: Text(
+          title,
+          style: GoogleFonts.inter(
+            color: Colors.black87,
+            fontSize: 15,
+            fontWeight: FontWeight.w600,
+          ),
         ),
-      ),
-      subtitle: subtitle != null
-          ? Text(
-              subtitle,
-              style: GoogleFonts.inter(color: Colors.black54, fontSize: 12),
-            )
-          : null,
-      trailing: Container(
-        padding: const EdgeInsets.all(4),
-        decoration: BoxDecoration(
-          color: Colors.grey.shade100,
-          shape: BoxShape.circle,
-        ),
-        child: const Icon(
+        subtitle: subtitle != null
+            ? Text(
+                subtitle,
+                style: GoogleFonts.inter(color: Colors.black54, fontSize: 12),
+              )
+            : null,
+        trailing: const Icon(
           Icons.arrow_forward_ios,
           size: 14,
           color: Colors.black45,
         ),
       ),
-      onTap: onTap,
     );
   }
 
@@ -782,4 +1116,321 @@ class _ProfilePageState extends State<ProfilePage> {
     endIndent: 20,
     color: Colors.black12,
   );
+}
+
+// =============================================================================
+// 🚀 LOCAL FUNCTIONAL SCREENS (Replaces the "Under Construction" blockers)
+// =============================================================================
+
+class LocalSettingsScreen extends StatefulWidget {
+  const LocalSettingsScreen({super.key});
+  @override
+  State<LocalSettingsScreen> createState() => _LocalSettingsScreenState();
+}
+
+class _LocalSettingsScreenState extends State<LocalSettingsScreen> {
+  bool notifs = true;
+  bool emailPromo = false;
+  bool location = true;
+  bool faceId = false;
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFFF4F6F8),
+      appBar: AppBar(
+        title: Text(
+          "Settings",
+          style: GoogleFonts.inter(
+            color: Colors.black87,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        backgroundColor: Colors.white,
+        centerTitle: true,
+      ),
+      body: ListView(
+        padding: const EdgeInsets.all(20),
+        children: [
+          Text(
+            "NOTIFICATIONS",
+            style: GoogleFonts.inter(
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+              color: Colors.grey,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(15),
+            ),
+            child: Column(
+              children: [
+                SwitchListTile(
+                  activeColor: const Color(0xFF2B8C61),
+                  title: Text(
+                    "Push Notifications",
+                    style: GoogleFonts.inter(fontWeight: FontWeight.w600),
+                  ),
+                  value: notifs,
+                  onChanged: (v) => setState(() => notifs = v),
+                ),
+                const Divider(height: 1),
+                SwitchListTile(
+                  activeColor: const Color(0xFF2B8C61),
+                  title: Text(
+                    "Email Promotions",
+                    style: GoogleFonts.inter(fontWeight: FontWeight.w600),
+                  ),
+                  value: emailPromo,
+                  onChanged: (v) => setState(() => emailPromo = v),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 30),
+          Text(
+            "PRIVACY & SECURITY",
+            style: GoogleFonts.inter(
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+              color: Colors.grey,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(15),
+            ),
+            child: Column(
+              children: [
+                SwitchListTile(
+                  activeColor: const Color(0xFF2B8C61),
+                  title: Text(
+                    "Location Services",
+                    style: GoogleFonts.inter(fontWeight: FontWeight.w600),
+                  ),
+                  value: location,
+                  onChanged: (v) => setState(() => location = v),
+                ),
+                const Divider(height: 1),
+                SwitchListTile(
+                  activeColor: const Color(0xFF2B8C61),
+                  title: Text(
+                    "Biometric Login",
+                    style: GoogleFonts.inter(fontWeight: FontWeight.w600),
+                  ),
+                  value: faceId,
+                  onChanged: (v) => setState(() => faceId = v),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class LocalPaymentScreen extends StatelessWidget {
+  const LocalPaymentScreen({super.key});
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFFF4F6F8),
+      appBar: AppBar(
+        title: Text(
+          "Payment Methods",
+          style: GoogleFonts.inter(
+            color: Colors.black87,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        backgroundColor: Colors.white,
+        centerTitle: true,
+      ),
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.credit_card, size: 80, color: Colors.grey.shade300),
+            const SizedBox(height: 20),
+            Text(
+              "No Linked Cards",
+              style: GoogleFonts.inter(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              "Add a credit card or GCash account to checkout faster.",
+              textAlign: TextAlign.center,
+              style: GoogleFonts.inter(color: Colors.grey),
+            ),
+          ],
+        ),
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        backgroundColor: const Color(0xFF2B8C61),
+        onPressed: () {},
+        icon: const Icon(Icons.add, color: Colors.white),
+        label: Text(
+          "Add Payment",
+          style: GoogleFonts.inter(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class LocalReviewsScreen extends StatelessWidget {
+  const LocalReviewsScreen({super.key});
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFFF4F6F8),
+      appBar: AppBar(
+        title: Text(
+          "My Reviews",
+          style: GoogleFonts.inter(
+            color: Colors.black87,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        backgroundColor: Colors.white,
+        centerTitle: true,
+      ),
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.star_border, size: 80, color: Colors.grey.shade300),
+            const SizedBox(height: 20),
+            Text(
+              "No Reviews Yet",
+              style: GoogleFonts.inter(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              "Items you review will appear here.",
+              textAlign: TextAlign.center,
+              style: GoogleFonts.inter(color: Colors.grey),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class LocalHelpScreen extends StatelessWidget {
+  const LocalHelpScreen({super.key});
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFFF4F6F8),
+      appBar: AppBar(
+        title: Text(
+          "Help Center",
+          style: GoogleFonts.inter(
+            color: Colors.black87,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        backgroundColor: Colors.white,
+        centerTitle: true,
+      ),
+      body: ListView(
+        padding: const EdgeInsets.all(20),
+        children: [
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: const Color(0xFF003466),
+              borderRadius: BorderRadius.circular(15),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  "Hi there! How can we help?",
+                  style: GoogleFonts.inter(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 15),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 15),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: TextField(
+                    decoration: InputDecoration(
+                      border: InputBorder.none,
+                      hintText: "Search for topics...",
+                      hintStyle: GoogleFonts.inter(color: Colors.grey),
+                      suffixIcon: const Icon(Icons.search, color: Colors.grey),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 30),
+          Text(
+            "FAQ",
+            style: GoogleFonts.inter(
+              fontWeight: FontWeight.bold,
+              color: Colors.grey,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Card(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(15),
+            ),
+            child: Column(
+              children: [
+                ListTile(
+                  title: Text(
+                    "How to track my order?",
+                    style: GoogleFonts.inter(fontWeight: FontWeight.w600),
+                  ),
+                  trailing: const Icon(Icons.keyboard_arrow_down),
+                ),
+                const Divider(height: 1),
+                ListTile(
+                  title: Text(
+                    "Return and Refund Policy",
+                    style: GoogleFonts.inter(fontWeight: FontWeight.w600),
+                  ),
+                  trailing: const Icon(Icons.keyboard_arrow_down),
+                ),
+                const Divider(height: 1),
+                ListTile(
+                  title: Text(
+                    "How to contact seller?",
+                    style: GoogleFonts.inter(fontWeight: FontWeight.w600),
+                  ),
+                  trailing: const Icon(Icons.keyboard_arrow_down),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }

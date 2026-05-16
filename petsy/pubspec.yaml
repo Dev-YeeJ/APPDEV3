@@ -35,10 +35,12 @@ dependencies:
   firebase_core: ^3.10.1
   firebase_auth: ^5.4.1
   cloud_firestore: ^5.6.1
+  firebase_messaging: ^15.2.10
+  flutter_local_notifications: ^18.0.0
   image_picker: ^1.0.7
   philippines_rpcmb: ^0.0.3
   google_fonts: ^6.2.1  # Add this line
-  
+  flutter_launcher_icons: ^0.13.1
   cupertino_icons: ^1.0.8
   firebase_storage: ^12.4.10
   share_plus: ^12.0.1
@@ -72,6 +74,7 @@ flutter:
 
   
   assets:
+  - assets/images/app_logo.png
   - assets/images/splash1.png
   - assets/images/splash2.png
   - assets/images/obs1.png
@@ -110,7 +113,10 @@ flutter:
   - assets/images/products/poop_bags.jpg
   - assets/images/products/reversable_dog_jacket.jpg
   
-
+flutter_icons:
+  android: true
+  ios: true
+  image_path: "assets/images/app_logo.png"
   # To add assets to your application, add an assets section, like this:
 
   # An image asset can refer to one or more resolution-specific "variants", see

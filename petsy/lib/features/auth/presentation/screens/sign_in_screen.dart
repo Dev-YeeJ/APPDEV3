@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart'; // 🚀 Added for Admin check
 import 'package:google_fonts/google_fonts.dart';
 import 'sign_up_screen.dart'; // Import for Navigation & Shared Widgets
-// Ensure this path is correct for your ProfilePage
-import 'package:petsy/features/home/presentation/screens/profile_page.dart';
+
+// Ensure these paths are correct for your project
+import 'package:petsy/features/home/presentation/screens/home_screen.dart'; // 🚀 Changed to route to Home for normal users
+import 'package:petsy/features/admin/presentation/screens/admin_dashboard_screen.dart'; // 🚀 Added for Admin routing
 
 class SignInScreen extends StatefulWidget {
   const SignInScreen({super.key});
@@ -63,6 +66,7 @@ class _SignInScreenState extends State<SignInScreen> {
     );
   }
 
+  // 🚀 UPDATED SIGN IN LOGIC FOR ADMIN SPLIT 🚀
   Future<void> _handleSignIn() async {
     if (!_formKey.currentState!.validate()) {
       _showModernToast("Please fix the errors", isError: true);
@@ -72,18 +76,39 @@ class _SignInScreenState extends State<SignInScreen> {
     setState(() => _isLoading = true);
 
     try {
-      await FirebaseAuth.instance.signInWithEmailAndPassword(
-        email: _emailController.text.trim(),
-        password: _passwordController.text.trim(),
-      );
+      // 1. Authenticate with Firebase Auth
+      final userCredential = await FirebaseAuth.instance
+          .signInWithEmailAndPassword(
+            email: _emailController.text.trim(),
+            password: _passwordController.text.trim(),
+          );
 
-      if (mounted) {
+      if (mounted && userCredential.user != null) {
         _showModernToast("Welcome back!", isError: false);
-        // Navigate to Profile Page (or Home)
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => const ProfilePage()),
-        );
+
+        // 2. Fetch their user document to check admin status
+        final userDoc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(userCredential.user!.uid)
+            .get();
+
+        if (mounted) {
+          if (userDoc.exists && userDoc.data()?['isAdmin'] == true) {
+            // 🚀 Route to Admin Interface
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const AdminDashboardScreen(),
+              ),
+            );
+          } else {
+            // 🚀 Route to Normal User Interface (Home Screen is standard entry point)
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (context) => const HomeScreen()),
+            );
+          }
+        }
       }
     } on FirebaseAuthException catch (e) {
       if (mounted) {
@@ -374,3 +399,6 @@ class _SignInScreenState extends State<SignInScreen> {
     ),
   );
 }
+
+// Ensure these widgets are either in this file or imported if they were originally here!
+// FloatingValidatorField and GradientWavePainter

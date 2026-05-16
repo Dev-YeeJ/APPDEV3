@@ -2,11 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:share_plus/share_plus.dart';
-
-// --- Ensure these paths match your project folder structure ---
-import 'package:petsy/features/home/presentation/screens/checkout_screen.dart';
-import 'package:petsy/features/home/presentation/screens/cart_screen.dart'; // 🚀 ADDED CART SCREEN IMPORT
 import 'package:provider/provider.dart';
+
+// --- Ensure these paths match your project ---
+import 'package:petsy/features/home/presentation/screens/checkout_screen.dart';
+import 'package:petsy/features/home/presentation/screens/cart_screen.dart';
+import 'package:petsy/features/home/presentation/screens/customer_chat_list_screen.dart';
+import 'package:petsy/features/home/presentation/screens/home_screen.dart'; // To use PersonalFavoriteButton
 import 'package:petsy/providers/cart_provider.dart';
 
 class ProductDetailsScreen extends StatefulWidget {
@@ -19,17 +21,13 @@ class ProductDetailsScreen extends StatefulWidget {
 }
 
 class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
-  // --- MATCHING HOME SCREEN COLORS ---
   final Color _petsyGreen = const Color(0xFF2B8C61);
   final Color _petsyNavy = const Color(0xFF003466);
   final Color _appBackground = const Color(0xFFF8F9FA);
 
-  // State Variables
   int _quantity = 1;
-  bool _isFavorite = false;
   bool _isDescExpanded = false;
 
-  // Dynamic Variation Variables
   late String _opt1Title;
   late List<String> _opt1List;
   late String _selectedOpt1;
@@ -38,9 +36,11 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
   late List<String> _opt2List;
   late String _selectedOpt2;
 
-  // Pricing Logic
   late double _basePrice;
   late double _currentUnitPrice;
+
+  // 🚀 NEW: Check if the product is out of stock
+  late bool _isOutOfStock;
 
   @override
   void initState() {
@@ -49,28 +49,36 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
   }
 
   void _setupProductData() {
-    _basePrice =
-        double.tryParse(widget.product['price']?.toString() ?? '0.0') ?? 0.0;
+    // 🚀 READS EXACT PRICE FROM FIREBASE
+    _basePrice = (widget.product['price'] as num?)?.toDouble() ?? 0.0;
     _currentUnitPrice = _basePrice;
-    _isFavorite = widget.product['isFavorite'] == true;
 
-    final String pType = widget.product['productType']?.toString() ?? 'Food';
+    // 🚀 READ OUT OF STOCK STATUS
+    _isOutOfStock = widget.product['isOutOfStock'] ?? false;
 
-    if (pType == 'Food') {
-      _opt1Title = "Flavor";
-      _opt1List = ['Chicken and White Rice', 'Sweet Potato', 'Banana', 'Apple'];
-      _opt2Title = "Size";
-      _opt2List = ['250 g', '500 g', '1 kg', '5 kg'];
-    } else if (pType == 'Toy') {
-      _opt1Title = "Color";
-      _opt1List = ['Classic Red', 'Ocean Blue', 'Neon Yellow'];
-      _opt2Title = "Size";
-      _opt2List = ['Small', 'Medium', 'Large'];
+    final String pType =
+        widget.product['productType']?.toString() ?? 'Accessory';
+
+    // 🚀 READS EXACT FLAVORS/COLORS FROM FIREBASE
+    List<dynamic> dbFlavors = widget.product['flavors'] ?? [];
+    if (dbFlavors.isNotEmpty) {
+      _opt1Title = (pType == 'Food' || pType == 'Treats')
+          ? "Flavor"
+          : "Variant";
+      _opt1List = dbFlavors.map((e) => e.toString()).toList();
     } else {
-      _opt1Title = "Color";
-      _opt1List = ['Midnight Black', 'Rose Pink', 'Cloud Grey'];
+      _opt1Title = "Variant";
+      _opt1List = ['Standard'];
+    }
+
+    // 🚀 READS EXACT SIZES FROM FIREBASE
+    List<dynamic> dbSizes = widget.product['sizes'] ?? [];
+    if (dbSizes.isNotEmpty) {
       _opt2Title = "Size";
-      _opt2List = ['Small', 'Medium', 'Large', 'Extra Large'];
+      _opt2List = dbSizes.map((e) => e.toString()).toList();
+    } else {
+      _opt2Title = "Size";
+      _opt2List = ['Standard'];
     }
 
     _selectedOpt1 = _opt1List.first;
@@ -82,14 +90,16 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
       _selectedOpt2 = newSize;
       int sizeIndex = _opt2List.indexOf(newSize);
 
-      if (sizeIndex == 0)
+      // Simple price scaling based on size selection
+      if (sizeIndex == 0) {
         _currentUnitPrice = _basePrice;
-      else if (sizeIndex == 1)
-        _currentUnitPrice = _basePrice * 1.8;
-      else if (sizeIndex == 2)
-        _currentUnitPrice = _basePrice * 3.5;
-      else if (sizeIndex == 3)
-        _currentUnitPrice = _basePrice * 15.0;
+      } else if (sizeIndex == 1) {
+        _currentUnitPrice = _basePrice * 1.5;
+      } else if (sizeIndex == 2) {
+        _currentUnitPrice = _basePrice * 2.0;
+      } else if (sizeIndex == 3) {
+        _currentUnitPrice = _basePrice * 3.0;
+      }
     });
   }
 
@@ -102,23 +112,19 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
     );
   }
 
-  // 🌟 LOGICAL FUNCTION: Advanced Add To Cart Notification
   void _addToCart() {
     HapticFeedback.mediumImpact();
 
-    // 🚀 STEP 4: SEND DATA TO THE GLOBAL BRAIN (PROVIDER) 🚀
+    // Send to global cart!
     context.read<CartProvider>().addToCart(
       widget.product,
       _quantity,
-      _selectedOpt1, // Selected Flavor
-      _selectedOpt2, // Selected Size
+      _selectedOpt1,
+      _selectedOpt2,
       _currentUnitPrice,
     );
 
-    // Hide any previous snackbars so they don't pile up
     ScaffoldMessenger.of(context).hideCurrentSnackBar();
-
-    // Show the Success Notification
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
@@ -131,30 +137,29 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
         action: SnackBarAction(
           label: 'VIEW CART',
           textColor: Colors.white,
-          onPressed: () {
-            // Instantly jump to the Cart Screen
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(builder: (context) => const CartScreen()),
-            );
-          },
+          onPressed: () => Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => const CartScreen()),
+          ),
         ),
       ),
     );
   }
 
   Widget _buildProductImage(String imageUrl) {
-    if (imageUrl.isEmpty)
+    if (imageUrl.isEmpty) {
       return const Center(
         child: Icon(Icons.image, size: 100, color: Colors.grey),
       );
-    if (imageUrl.startsWith('http'))
+    }
+    if (imageUrl.startsWith('http')) {
       return Image.network(
         imageUrl,
         fit: BoxFit.contain,
         errorBuilder: (c, e, s) =>
             const Icon(Icons.image_not_supported, color: Colors.grey),
       );
+    }
     return Image.asset(
       imageUrl,
       fit: BoxFit.contain,
@@ -169,12 +174,12 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
     final String rating = widget.product['rating']?.toString() ?? '0.0';
     final String sold = widget.product['sold']?.toString() ?? '0';
     final String imageUrl = widget.product['image'] ?? '';
-    final String brand = widget.product['brand'] ?? 'Natural Balance';
+    final String brand = widget.product['brand'] ?? 'Petsy Partner';
 
+    // 🚀 READS EXACT DESCRIPTION FROM FIREBASE
     final String description =
-        (widget.product['description']?.toString().isNotEmpty == true)
-        ? widget.product['description']
-        : "Premium selection crafted with high-quality ingredients to ensure the health and happiness of your pet. Formulated by experts to provide balanced nutrition and everyday satisfaction.";
+        widget.product['description'] ??
+        "Premium selection crafted with high-quality ingredients to ensure the health and happiness of your pet. Formulated by experts to provide balanced nutrition and everyday satisfaction.";
 
     return Scaffold(
       backgroundColor: _appBackground,
@@ -205,13 +210,18 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
         ),
         centerTitle: true,
         actions: [
+          // Uses the exact same smart personal favorites button we added to Home!
+          PersonalFavoriteButton(product: widget.product),
+          const SizedBox(width: 10),
           _buildHomeStyleActionButton(
-            icon: _isFavorite ? Icons.favorite : Icons.favorite_border,
-            iconColor: _isFavorite ? Colors.red : _petsyNavy,
-            onTap: () {
-              HapticFeedback.selectionClick();
-              setState(() => _isFavorite = !_isFavorite);
-            },
+            icon: Icons.forum_outlined,
+            iconColor: _petsyNavy,
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const CustomerChatListScreen(),
+              ),
+            ),
           ),
           const SizedBox(width: 10),
           _buildHomeStyleActionButton(
@@ -250,10 +260,58 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                         ),
                       ],
                     ),
-                    padding: const EdgeInsets.all(30),
-                    child: Hero(
-                      tag: imageUrl.isNotEmpty ? imageUrl : 'product_image',
-                      child: _buildProductImage(imageUrl),
+                    child: Stack(
+                      children: [
+                        Positioned.fill(
+                          child: Padding(
+                            padding: const EdgeInsets.all(30),
+                            child: Hero(
+                              tag: imageUrl.isNotEmpty
+                                  ? imageUrl
+                                  : 'product_image',
+                              child: _buildProductImage(imageUrl),
+                            ),
+                          ),
+                        ),
+                        // 🚀 BIG SOLD OUT BADGE IF OUT OF STOCK
+                        if (_isOutOfStock)
+                          Positioned.fill(
+                            child: Container(
+                              decoration: BoxDecoration(
+                                color: Colors.white.withOpacity(0.65),
+                                borderRadius: BorderRadius.circular(30),
+                              ),
+                              child: Center(
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 24,
+                                    vertical: 12,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: Colors.red.shade700,
+                                    borderRadius: BorderRadius.circular(12),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.red.withOpacity(0.3),
+                                        blurRadius: 10,
+                                        offset: const Offset(0, 4),
+                                      ),
+                                    ],
+                                  ),
+                                  child: Text(
+                                    "SOLD OUT",
+                                    style: GoogleFonts.inter(
+                                      color: Colors.white,
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.w900,
+                                      letterSpacing: 1,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                      ],
                     ),
                   ),
 
@@ -329,70 +387,80 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                               style: GoogleFonts.inter(
                                 fontSize: 32,
                                 fontWeight: FontWeight.w900,
-                                color: Colors.black87,
+                                color: _isOutOfStock
+                                    ? Colors.grey.shade400
+                                    : Colors.black87,
                                 letterSpacing: -1,
                               ),
                             ),
-                            Row(
-                              children: [
-                                GestureDetector(
-                                  onTap: () {
-                                    if (_quantity > 1) {
-                                      HapticFeedback.lightImpact();
-                                      setState(() => _quantity--);
-                                    }
-                                  },
-                                  child: Container(
-                                    padding: const EdgeInsets.all(4),
-                                    decoration: BoxDecoration(
-                                      shape: BoxShape.circle,
-                                      border: Border.all(
-                                        color: Colors.grey.shade400,
-                                        width: 1.5,
+                            // 🚀 QUANTITY SELECTOR (Disabled if out of stock)
+                            Opacity(
+                              opacity: _isOutOfStock ? 0.5 : 1.0,
+                              child: Row(
+                                children: [
+                                  GestureDetector(
+                                    onTap: _isOutOfStock
+                                        ? null
+                                        : () {
+                                            if (_quantity > 1) {
+                                              HapticFeedback.lightImpact();
+                                              setState(() => _quantity--);
+                                            }
+                                          },
+                                    child: Container(
+                                      padding: const EdgeInsets.all(4),
+                                      decoration: BoxDecoration(
+                                        shape: BoxShape.circle,
+                                        border: Border.all(
+                                          color: Colors.grey.shade400,
+                                          width: 1.5,
+                                        ),
                                       ),
-                                    ),
-                                    child: Icon(
-                                      Icons.remove,
-                                      size: 18,
-                                      color: Colors.grey.shade700,
-                                    ),
-                                  ),
-                                ),
-                                SizedBox(
-                                  width: 45,
-                                  child: Center(
-                                    child: Text(
-                                      "$_quantity",
-                                      style: GoogleFonts.inter(
-                                        fontSize: 22,
-                                        fontWeight: FontWeight.bold,
-                                        color: Colors.black87,
+                                      child: Icon(
+                                        Icons.remove,
+                                        size: 18,
+                                        color: Colors.grey.shade700,
                                       ),
                                     ),
                                   ),
-                                ),
-                                GestureDetector(
-                                  onTap: () {
-                                    HapticFeedback.lightImpact();
-                                    setState(() => _quantity++);
-                                  },
-                                  child: Container(
-                                    padding: const EdgeInsets.all(4),
-                                    decoration: BoxDecoration(
-                                      shape: BoxShape.circle,
-                                      border: Border.all(
+                                  SizedBox(
+                                    width: 45,
+                                    child: Center(
+                                      child: Text(
+                                        "$_quantity",
+                                        style: GoogleFonts.inter(
+                                          fontSize: 22,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.black87,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  GestureDetector(
+                                    onTap: _isOutOfStock
+                                        ? null
+                                        : () {
+                                            HapticFeedback.lightImpact();
+                                            setState(() => _quantity++);
+                                          },
+                                    child: Container(
+                                      padding: const EdgeInsets.all(4),
+                                      decoration: BoxDecoration(
+                                        shape: BoxShape.circle,
+                                        border: Border.all(
+                                          color: _petsyGreen,
+                                          width: 1.5,
+                                        ),
+                                      ),
+                                      child: Icon(
+                                        Icons.add,
+                                        size: 18,
                                         color: _petsyGreen,
-                                        width: 1.5,
                                       ),
                                     ),
-                                    child: Icon(
-                                      Icons.add,
-                                      size: 18,
-                                      color: _petsyGreen,
-                                    ),
                                   ),
-                                ),
-                              ],
+                                ],
+                              ),
                             ),
                           ],
                         ),
@@ -419,9 +487,13 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                           },
                         ),
 
+                        // 🚀 NEW: Store Profile Section
+                        _buildStoreProfile(brand),
+                        const SizedBox(height: 25),
+
                         Text(
                           widget.product['productType'] == 'Food'
-                              ? "Ingredients"
+                              ? "Ingredients & Description"
                               : "Description",
                           style: GoogleFonts.inter(
                             fontSize: 18,
@@ -470,6 +542,14 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                             ],
                           ),
                         ),
+                        const SizedBox(height: 25),
+
+                        // 🚀 NEW: Shipping Info
+                        _buildShippingInfo(),
+                        const SizedBox(height: 25),
+
+                        // 🚀 NEW: Review Summary
+                        _buildReviewSummary(rating, sold),
                         const SizedBox(height: 40),
                       ],
                     ),
@@ -500,18 +580,26 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                   height: 52,
                   child: OutlinedButton(
                     style: OutlinedButton.styleFrom(
-                      side: BorderSide(color: _petsyGreen, width: 2),
+                      // 🚀 GREY OUT IF OUT OF STOCK
+                      side: BorderSide(
+                        color: _isOutOfStock
+                            ? Colors.grey.shade300
+                            : _petsyGreen,
+                        width: 2,
+                      ),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(16),
                       ),
                     ),
-                    onPressed: _addToCart,
+                    onPressed: _isOutOfStock ? null : _addToCart,
                     child: Text(
-                      "Add To Cart",
+                      _isOutOfStock ? "Unavailable" : "Add To Cart",
                       style: GoogleFonts.inter(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
-                        color: _petsyNavy,
+                        color: _isOutOfStock
+                            ? Colors.grey.shade400
+                            : _petsyNavy,
                       ),
                     ),
                   ),
@@ -522,33 +610,46 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
                   height: 52,
                   child: ElevatedButton(
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: _petsyGreen,
+                      // 🚀 GREY OUT IF OUT OF STOCK
+                      backgroundColor: _isOutOfStock
+                          ? Colors.grey.shade300
+                          : _petsyGreen,
                       elevation: 0,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(16),
                       ),
                     ),
-                    onPressed: () {
-                      HapticFeedback.heavyImpact();
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => CheckoutScreen(
-                            product: widget.product,
-                            quantity: _quantity,
-                            selectedFlavor: _selectedOpt1,
-                            selectedSize: _selectedOpt2,
-                            unitPrice: _currentUnitPrice,
-                          ),
-                        ),
-                      );
-                    },
+                    onPressed: _isOutOfStock
+                        ? null
+                        : () {
+                            HapticFeedback.heavyImpact();
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => CheckoutScreen(
+                                  checkoutItems: [
+                                    {
+                                      'product': widget.product,
+                                      'quantity': _quantity,
+                                      'selectedFlavor': _selectedOpt1,
+                                      'selectedSize': _selectedOpt2,
+                                      'unitPrice': _currentUnitPrice,
+                                    },
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
                     child: Text(
-                      "Check Out  •  ₱${_formatPrice(_currentUnitPrice * _quantity)}",
+                      _isOutOfStock
+                          ? "Out of Stock"
+                          : "Check Out  •  ₱${_formatPrice(_currentUnitPrice * _quantity)}",
                       style: GoogleFonts.inter(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
-                        color: Colors.white,
+                        color: _isOutOfStock
+                            ? Colors.grey.shade500
+                            : Colors.white,
                       ),
                     ),
                   ),
@@ -560,8 +661,6 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
       ),
     );
   }
-
-  // --- UI HELPER WIDGETS ---
 
   Widget _buildHomeStyleActionButton({
     required IconData icon,
@@ -621,7 +720,6 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
           itemBuilder: (context, index) {
             final String option = options[index];
             final bool isSelected = selected == option;
-
             return GestureDetector(
               onTap: () => onSelect(option),
               child: AnimatedContainer(
@@ -650,6 +748,237 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
         ),
         const SizedBox(height: 25),
       ],
+    );
+  }
+
+  Widget _buildStoreProfile(String brand) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.grey.shade200),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.02),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          CircleAvatar(
+            radius: 24,
+            backgroundColor: _petsyGreen.withOpacity(0.1),
+            child: Icon(Icons.storefront, color: _petsyGreen, size: 28),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  brand,
+                  style: GoogleFonts.inter(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                    color: _petsyNavy,
+                  ),
+                ),
+                Text(
+                  "Official Store",
+                  style: GoogleFonts.inter(
+                    fontSize: 12,
+                    color: Colors.grey.shade600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          OutlinedButton(
+            onPressed: () {},
+            style: OutlinedButton.styleFrom(
+              side: BorderSide(color: _petsyGreen),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            ),
+            child: Text(
+              "View Shop",
+              style: GoogleFonts.inter(
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+                color: _petsyGreen,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildShippingInfo() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            "Delivery Options",
+            style: GoogleFonts.inter(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: _petsyNavy,
+            ),
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Icon(Icons.local_shipping_outlined, color: _petsyGreen, size: 24),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      "Standard Delivery",
+                      style: GoogleFonts.inter(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 14,
+                        color: Colors.black87,
+                      ),
+                    ),
+                    Text(
+                      "Receive by tomorrow with Prime",
+                      style: GoogleFonts.inter(
+                        fontSize: 12,
+                        color: Colors.grey.shade600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Text(
+                "₱50.00",
+                style: GoogleFonts.inter(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                  color: Colors.black87,
+                ),
+              ),
+            ],
+          ),
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 12),
+            child: Divider(height: 1, thickness: 1),
+          ),
+          Row(
+            children: [
+              Icon(
+                Icons.assignment_return_outlined,
+                color: _petsyGreen,
+                size: 24,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      "7 Days Return",
+                      style: GoogleFonts.inter(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 14,
+                        color: Colors.black87,
+                      ),
+                    ),
+                    Text(
+                      "Change of mind is not applicable",
+                      style: GoogleFonts.inter(
+                        fontSize: 12,
+                        color: Colors.grey.shade600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildReviewSummary(String rating, String sold) {
+    double parsedRating = double.tryParse(rating) ?? 0.0;
+    return InkWell(
+      onTap: () {},
+      borderRadius: BorderRadius.circular(12),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8.0),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  "Ratings & Reviews",
+                  style: GoogleFonts.inter(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                    color: Colors.black87,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    Text(
+                      rating,
+                      style: GoogleFonts.inter(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black87,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Row(
+                      children: List.generate(5, (index) {
+                        return Icon(
+                          index < parsedRating.floor()
+                              ? Icons.star
+                              : (index < parsedRating
+                                    ? Icons.star_half
+                                    : Icons.star_border),
+                          color: Colors.amber,
+                          size: 20,
+                        );
+                      }),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      "($sold sold)",
+                      style: GoogleFonts.inter(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.grey.shade600,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+            Icon(Icons.chevron_right, color: Colors.grey.shade400, size: 28),
+          ],
+        ),
+      ),
     );
   }
 }
